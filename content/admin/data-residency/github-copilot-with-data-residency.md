@@ -49,6 +49,9 @@ The models available for {% data variables.product.prodname_copilot_short %} var
 ### United States
 
 {% data reusables.copilot.model-compliance.us-models %}
+* {% data variables.copilot.gemini_4_carbon %}
+* {% data variables.copilot.gemini_4_hydrogen %}
+* {% data variables.copilot.gemini_4_neon %}
 
 ### European Union
 
@@ -59,19 +62,21 @@ The models available for {% data variables.product.prodname_copilot_short %} var
 * {% data variables.copilot.gpt_54_nano %}
 * {% data variables.copilot.gpt_56_luna %}
 * {% data variables.copilot.gpt_56_sol %}
-* {% data variables.copilot.gpt_56_terra %}
 * {% data variables.copilot.gpt_6_astra %}
 * {% data variables.copilot.gpt_6_luna %}
 * {% data variables.copilot.gpt_6_sol %}
 * {% data variables.copilot.gpt_61_sol %}
+* {% data variables.copilot.gpt_62_astra %}
+* {% data variables.copilot.gpt_62_sol %}
 * {% data variables.copilot.claude_haiku_45 %}
 * {% data variables.copilot.claude_haiku_55 %}
-* {% data variables.copilot.claude_opus_48 %}
-* {% data variables.copilot.claude_opus_5 %}
 * {% data variables.copilot.claude_opus_55 %}
 * {% data variables.copilot.claude_sonnet_5 %}
 * {% data variables.copilot.claude_sonnet_55 %}
 * {% data variables.copilot.gemini_4_argon %}
+* {% data variables.copilot.gemini_4_carbon %}
+* {% data variables.copilot.gemini_4_hydrogen %}
+* {% data variables.copilot.gemini_4_neon %}
 
 ## Pricing changes
 

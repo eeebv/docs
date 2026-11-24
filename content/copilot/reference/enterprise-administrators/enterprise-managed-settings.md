@@ -27,6 +27,7 @@ For instructions on creating the file, see [AUTOTITLE](/copilot/how-tos/administ
 | `permissions.disableAssistedPermissionsMode` | Prevents users from enabling {% data variables.copilot.assisted_permissions %} |
 | `permissions.defaultMode` | Controls the default permission mode for new sessions |
 | `features.computerUse` | Controls whether users can enable computer use |
+| `features.browserUse` | Controls whether users can enable browser use |
 | `model` | Sets your preferred model as the default for new conversations |
 | `fusionTier` | Sets the default effort level for new conversations when the selected model is `fusion` |
 | `autoTier` | Sets the default Auto routing tier for new conversations |
@@ -34,6 +35,7 @@ For instructions on creating the file, see [AUTOTITLE](/copilot/how-tos/administ
 | `enabledPlugins` | Enables or disables specific plugins by key |
 | `extraKnownMarketplaces` | Adds plugin marketplaces that users can access |
 | `strictKnownMarketplaces` | Restricts plugin installation to explicitly listed marketplaces |
+| `strictPluginOnlyCustomization` | Requires selected customization categories to come from eligible plugins or managed settings |
 | `telemetry` | Configures OpenTelemetry export, routing {% data variables.product.prodname_copilot_short %} usage data to a collector of your choice |
 | `remoteControl` | Restricts whether sessions hosted on this device can be remotely controlled, based on the controlling client's SSO authorization status for the listed organizations. Doesn't affect the user's ability to remotely control sessions hosted on other devices |
 | `forceRemoteSettingsRefresh` | Requires a fresh server-managed settings fetch on client startup |
@@ -60,8 +62,9 @@ Some keys require a minimum version in certain clients. See the footnotes in the
 | `permissions.disableAssistedPermissionsMode` | {% octicon "check" aria-label="Supported" %} | {% octicon "check" aria-label="Supported" %} | {% octicon "check" aria-label="Supported" %} | {% octicon "check" aria-label="Supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} |
 | `permissions.defaultMode` | {% octicon "check" aria-label="Supported" %} | {% octicon "check" aria-label="Supported" %} | {% octicon "check" aria-label="Supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} |
 | `features.computerUse` | {% octicon "check" aria-label="Supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "check" aria-label="Supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} |
+| `features.browserUse` | {% octicon "check" aria-label="Supported" %} | {% octicon "check" aria-label="Supported" %} | {% octicon "check" aria-label="Supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "check" aria-label="Supported" %} |
 | `model` | {% octicon "check" aria-label="Supported" %} | {% octicon "check" aria-label="Supported" %} | {% octicon "check" aria-label="Supported" %} | {% octicon "check" aria-label="Supported" %} | {% octicon "check" aria-label="Supported" %} | {% octicon "x" aria-label="Not supported" %} |
-| `fusionTier` | {% octicon "check" aria-label="Supported" %}[^fusion-tier-cli] | {% octicon "check" aria-label="Supported" %}[^fusion-tier-vscode] | {% octicon "check" aria-label="Supported" %}[^fusion-tier-app] | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} |
+| `fusionTier` | {% octicon "check" aria-label="Supported" %}[^fusion-tier-cli] | {% octicon "check" aria-label="Supported" %}[^fusion-tier-vscode] | {% octicon "check" aria-label="Supported" %}[^fusion-tier-app] | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "check" aria-label="Supported" %}[^fusion-tier-jetbrains] |
 | `autoTier` | {% octicon "check" aria-label="Supported" %}[^auto-tier-cli] | {% octicon "check" aria-label="Supported" %}[^auto-tier-vscode] | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} |
 | `communication.support.url` | {% octicon "check" aria-label="Supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "x" aria-label="Not supported" %} |
 | `enabledPlugins` | {% octicon "check" aria-label="Supported" %} | {% octicon "check" aria-label="Supported" %} | {% octicon "check" aria-label="Supported" %} | {% octicon "x" aria-label="Not supported" %} | {% octicon "check" aria-label="Supported" %} | {% octicon "check" aria-label="Supported" %} |
@@ -83,6 +86,8 @@ Some keys require a minimum version in certain clients. See the footnotes in the
 [^fusion-tier-vscode]: `fusionTier` requires {% data variables.product.prodname_vscode_shortname %} 1.144.0 or later.
 
 [^fusion-tier-app]: `fusionTier` requires the {% data variables.copilot.github_copilot_app %} 1.1.33-4 or later.
+
+[^fusion-tier-jetbrains]: `fusionTier` requires version 1.21.0 or later of the {% data variables.product.prodname_copilot %} plugin for {% data variables.product.prodname_jetbrains_ides %}.
 
 [^auto-tier-cli]: `autoTier` requires {% data variables.copilot.copilot_cli_short %} 1.0.87-0 or later.
 
@@ -111,7 +116,8 @@ The following example shows these keys in one managed settings file.
 ```json
 {
   "features": {
-    "computerUse": false
+    "computerUse": false,
+    "browserUse": false
   },
   "model": "auto",
   "autoTier": "intelligence",
@@ -207,6 +213,13 @@ The following example shows these keys in one managed settings file.
 
 Controls whether users can enable computer use in {% data variables.copilot.copilot_cli %} and the {% data variables.copilot.github_copilot_app %}. Set `features.computerUse` to `false` to prevent users from enabling computer use. A local setting cannot override this restriction. Set the value to `true`, or omit the key, to allow users to control computer use through their local settings.
 
+## features.browserUse
+
+> [!NOTE]
+> {% data reusables.copilot.browser-use-preview-note %}
+
+Controls whether users can enable browser use in a Copilot surface. Set `features.browserUse` to `false` to prevent users from enabling browser use. A local setting cannot override this restriction. Set the value to `true`, or omit the key, to allow users to control browser use through their local settings.
+
 ## enabledPlugins
 
 Defines plugins that are automatically installed or blocked for all enterprise users. Each entry uses the format `PLUGIN-NAME@MARKETPLACE-NAME` as the key, with a boolean value: `true` to require the plugin to be enabled, or `false` to require it to be disabled. See [AUTOTITLE](/copilot/concepts/enterprise/plugin-standards).
@@ -274,6 +287,64 @@ This key is overridable for enterprise teams. Wrap the complete allowlist in `ov
 ```
 
 Use a regular array in the enterprise team file to replace the default allowlist. Omitting the key retains the enterprise default. An explicit empty array, `[]`, means complete lockdown, not an unmanaged policy.
+
+## strictPluginOnlyCustomization
+
+Choose which customization categories must come from eligible plugins or managed settings instead of standalone user, workspace, or project configuration. This controls their sources without disabling the capabilities entirely. Other policies still determine which customizations can load.
+
+The setting accepts these values:
+
+* `true`: Restricts all five supported categories.
+* `false` or omitted: Adds no restriction from this key.
+* An array: Restricts only the listed categories.
+
+The supported category names are:
+
+{% rowheaders %}
+
+| Category | Customizations |
+| --- | --- |
+| `skills` | Agent skills |
+| `agents` | Custom agents |
+| `hooks` | Hooks |
+| `mcp` | MCP servers |
+| `extensions` | Executable {% data variables.product.prodname_copilot_short %} extensions, including canvas providers. This does not refer to {% data variables.product.prodname_vscode_shortname %} Marketplace extensions. |
+
+{% endrowheaders %}
+
+For `extensions`, the restriction also blocks standalone extensions loaded from session-state directories. There is no separate category for canvases.
+
+For example, restrict standalone MCP servers and executable extensions while leaving skills, agents, and hooks unrestricted by this key:
+
+```json
+{
+  "strictPluginOnlyCustomization": ["mcp", "extensions"]
+}
+```
+
+For server-managed deployments, wrap the value in `{ "overridable": VALUE }` to allow the following managed settings to replace the enterprise default:
+
+* Enterprise-team settings
+* Organization settings
+* Organization-team settings
+
+These sources can replace the default only when they apply to the user. Without an applicable replacement, the default remains. None of these layers can relax an unwrapped enterprise restriction.
+
+The server resolves the wrapper before sending the effective value to clients. User settings and repository settings cannot relax that value.
+
+Restrictions from overlapping enterprise team settings are combined. A category restricted by any matching team stays restricted, even if another team sets the key to `false` or omits that category.
+
+After the server resolves overrides, restrictions from server-managed, device-managed, and policy-helper settings are combined. Device-managed settings include both native MDM policies and administrator-deployed `managed-settings.json` files.
+
+A category restricted by any of these sources stays restricted, even if another source sets the key to `false` or omits that category. An enterprise team override cannot relax a device-managed restriction.
+
+For an example that allows a designated team to develop standalone MCP servers, see [AUTOTITLE](/copilot/how-tos/administer-copilot/manage-for-enterprise/use-managed-settings/override-settings-for-teams#allow-an-mcp-development-team-to-use-standalone-servers).
+
+Plugins can remain eligible even if the enterprise does not require them through `enabledPlugins`. Use `strictKnownMarketplaces` separately to restrict marketplace sources. For a combined example, see [AUTOTITLE](/copilot/how-tos/administer-copilot/manage-for-enterprise/use-managed-settings/manage-plugin-marketplaces-and-plugins#restrict-standalone-customizations).
+
+MCP server allowlists and denylists, stricter managed-only policies, permissions, and sandbox restrictions still apply. Allowing a customization's source does not grant it additional access.
+
+In {% data variables.product.prodname_vscode_shortname %}, this behavior applies to {% data variables.product.prodname_copilot_short %} sessions that use Agent Host. Do not rely on this setting to enforce the same restrictions in other session types.
 
 ## model
 
@@ -453,6 +524,8 @@ Omit this key entirely to allow all servers, subject to any entries in `deniedMc
 
 When multiple settings sources define `allowedMcpServers`, the effective allowlist is the intersection of all sources. A server must be permitted by every source to run.
 
+In {% data variables.copilot.copilot_cli_short %}, set the `allowManagedMcpServersOnly` key in MDM managed settings to `true` to restrict server eligibility to the managed `allowedMcpServers` allowlist, servers from managed or force-enabled plugins, and any fixed managed-MCP deployment. Lower-precedence user or workspace allowlist entries cannot broaden this policy. `deniedMcpServers` still applies, and trusted first-party servers remain exempt.
+
 Each entry must contain exactly one matcher property.
 
 | Property | Matching behavior | Applicable servers |
@@ -478,7 +551,9 @@ Before comparing a `serverUrl` pattern with a server URL, the client normalizes 
 
 Defines MCP servers that are unconditionally blocked. A server matching any entry is blocked even if it also matches an entry in `allowedMcpServers`. Deny rules always take precedence over allow rules.
 
-First-party {% data variables.product.prodname_copilot_short %} servers, such as the built-in {% data variables.product.github %} MCP server, are exempt from deny rules and cannot be blocked.
+First-party {% data variables.product.prodname_copilot_short %} servers, such as the built-in {% data variables.product.github %} MCP server, are exempt from these deny rules.
+
+In {% data variables.copilot.copilot_cli_short %}, the account's {% data variables.product.prodname_copilot_short %} MCP policy still applies to trusted first-party servers despite their exemption from `allowedMcpServers` and `deniedMcpServers`. If that policy disables MCP, the built-in {% data variables.product.github %} MCP server does not start.
 
 When multiple settings sources define `deniedMcpServers`, the effective denylist is the union of all sources. A server blocked by any source is blocked for all.
 
