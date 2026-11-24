@@ -1,5 +1,5 @@
 import { type Octokit } from '@octokit/rest'
-import coreLib from '@actions/core'
+import * as coreLib from '@actions/core'
 
 type CRIArgs = {
   core: typeof coreLib
@@ -18,7 +18,6 @@ export async function createReportIssue({
   reportLabel,
 }: CRIArgs) {
   const [owner, repo] = reportRepository.split('/')
-  // Create issue
   let newReport
   try {
     const { data } = await octokit.request('POST /repos/{owner}/{repo}/issues', {
@@ -30,8 +29,10 @@ export async function createReportIssue({
     })
     newReport = data
     core.info(`Created new report issue at ${newReport.html_url}\n`)
-  } catch (error: any) {
-    core.error(error)
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      core.error(error)
+    }
     core.setFailed('Error creating new issue')
     throw error
   }
@@ -42,7 +43,7 @@ export async function createReportIssue({
 type LRArgs = {
   core: typeof coreLib
   octokit: Octokit
-  newReport: any
+  newReport: { number: number; html_url: string }
   reportRepository: string
   reportAuthor: string
   reportLabel: string
@@ -58,7 +59,6 @@ export async function linkReports({
   const [owner, repo] = reportRepository.split('/')
 
   core.info('Attempting to link reports...')
-  // Find previous report issue
   let previousReports
   try {
     previousReports = await octokit.rest.issues.listForRepo({
@@ -66,7 +66,7 @@ export async function linkReports({
       repo,
       creator: reportAuthor,
       labels: reportLabel,
-      state: 'all', // We want to get the previous report, even if it is closed
+      state: 'all', // Include closed reports so the new report can link to the previous one.
       sort: 'created',
       direction: 'desc',
       per_page: 25,
@@ -83,10 +83,9 @@ export async function linkReports({
     return
   }
 
-  // 2nd report should be most recent previous report
+  // Index 0 is the new report, so index 1 is the previous report.
   const previousReport = previousReports[1]
 
-  // Comment the old report link on the new report
   try {
     await octokit.rest.issues.createComment({
       owner,
@@ -100,13 +99,12 @@ export async function linkReports({
     throw error
   }
 
-  // Comment on all previous reports that are still open
   for (const oldReport of previousReports) {
     if (oldReport.state === 'closed' || oldReport.html_url === newReport.html_url) {
       continue
     }
 
-    //  If an old report is not assigned to someone we close it
+    // Close unassigned old reports so owners can keep assigned reports open.
     const shouldClose = !oldReport.assignees?.length
     let body = `➡️ [Newer report](${newReport.html_url})`
     if (shouldClose) {

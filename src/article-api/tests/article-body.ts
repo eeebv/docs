@@ -2,14 +2,12 @@ import { beforeAll, describe, expect, test } from 'vitest'
 
 import { get } from '@/tests/helpers/e2etest'
 
-const makeURL = (pathname: string): string =>
-  `/api/article/body?${new URLSearchParams({ pathname })}`
+const makeURL = (pathname: string, apiVersion?: string): string =>
+  `/api/article/body?${new URLSearchParams(apiVersion ? { pathname, apiVersion } : { pathname })}`
 
 describe('article body api', () => {
   beforeAll(() => {
-    // If you didn't set the `ROOT` variable, the tests will fail rather
-    // cryptically. So as a warning for engineers running these tests,
-    // alert in case it was accidentally forgotten.
+    // Warn early because missing fixture roots otherwise fail with unclear errors.
     if (!process.env.ROOT) {
       console.warn(
         'WARNING: The article body tests require the ROOT environment variable to be set to the fixture root',
@@ -25,11 +23,25 @@ describe('article body api', () => {
     expect(res.headers['content-type']).toContain('text/markdown')
   })
 
+  test('sets the page surrogate key that deploy purges use', async () => {
+    const res = await get(makeURL('/en/get-started/start-your-journey/hello-world'))
+    expect(res.statusCode).toBe(200)
+    const keys = res.headers['surrogate-key'].split(/\s/g)
+    expect(keys).toContain('language:en')
+    expect(keys).toContain('language:en,path:get-started/start-your-journey/hello-world.md')
+  })
+
+  test('body includes title and intro', async () => {
+    const res = await get(makeURL('/en/get-started/start-your-journey/hello-world'))
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toMatch(/^# Hello World/)
+    expect(res.body).toContain('Follow this Hello World exercise to get started with')
+  })
+
   test('octicons auto-generate aria-labels', async () => {
     const res = await get(makeURL('/en/get-started/start-your-journey/hello-world'))
     expect(res.statusCode).toBe(200)
 
-    // Check that octicons without aria-label get auto-generated ones
     expect(res.body).toContain('aria-label="check icon"')
     expect(res.body).toContain('aria-label="git branch icon"')
   })
@@ -38,7 +50,6 @@ describe('article body api', () => {
     const res = await get(makeURL('/en/get-started/start-your-journey/hello-world'))
     expect(res.statusCode).toBe(200)
 
-    // Check that custom aria-labels are preserved
     expect(res.body).toContain('aria-label="Supported"')
     expect(res.body).toContain('aria-label="Not supported"')
   })
@@ -47,7 +58,6 @@ describe('article body api', () => {
     const res = await get(makeURL('/en/get-started/start-your-journey/hello-world'))
     expect(res.statusCode).toBe(200)
 
-    // Check that octicons with width attribute still get aria-labels
     expect(res.body).toContain('aria-label="rocket icon"')
     expect(res.body).toContain('width="32"')
   })
@@ -59,11 +69,56 @@ describe('article body api', () => {
     expect(error).toBe("No page found for '/en/never/heard/of'")
   })
 
-  test('non-article pages return error', async () => {
-    // Index pages are not articles and should not be renderable
-    const res = await get(makeURL('/en/get-started'))
-    expect(res.statusCode).toBe(403)
-    const { error } = JSON.parse(res.body)
-    expect(error).toContain("isn't yet available in markdown")
+  test('glossary page renders glossary terms', async () => {
+    const res = await get(makeURL('/en/get-started/learning-about-github/github-glossary'))
+    expect(res.statusCode).toBe(200)
+    // Glossary terms come from middleware context, not the markdown body.
+    expect(res.body).toContain('## foo')
+    expect(res.body).toContain('## check')
+    expect(res.body).toContain('Foo is an intentionally meaningless placeholder')
+  })
+
+  test('intro ifversion with a bare version name renders for the requested version', async () => {
+    {
+      const res = await get(makeURL('/en/get-started/liquid/ifversion'))
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('(bare not ghes)')
+      expect(res.body).not.toContain('(bare ghes)')
+    }
+    {
+      const res = await get(makeURL('/en/enterprise-server@latest/get-started/liquid/ifversion'))
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('(bare ghes)')
+      expect(res.body).not.toContain('(bare not ghes)')
+    }
+  })
+
+  test('apiVersion query filters Liquid that reads query.apiVersion', async () => {
+    const pathname = '/en/rest/about-the-rest-api/comparing-githubs-rest-api-and-graphql-api'
+    const marker = 'This paragraph applies to API version 2026-03-10 and later.'
+    {
+      const res = await get(makeURL(pathname))
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain(marker)
+    }
+    {
+      const res = await get(makeURL(pathname, '2026-03-10'))
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain(marker)
+    }
+    {
+      const res = await get(makeURL(pathname, '2022-11-28'))
+      expect(res.statusCode).toBe(200)
+      expect(res.body).not.toContain(marker)
+    }
+  })
+
+  test('invalid Referer header does not crash', async () => {
+    const res = await get(makeURL('/en/get-started/start-your-journey/hello-world'), {
+      headers: {
+        Referer: 'invalid-url',
+      },
+    })
+    expect(res.statusCode).toBe(200)
   })
 })

@@ -22,8 +22,10 @@ describe(tableColumnIntegrity.names.join(' - '), () => {
     const errors = result.markdown
     expect(errors.length).toBe(1)
     expect(errors[0].lineNumber).toBe(3)
-    if ((errors[0] as any).detail) {
-      expect((errors[0] as any).detail).toContain('Table row has 3 columns but header has 2')
+    if ((errors[0] as unknown as { detail?: string }).detail) {
+      expect((errors[0] as unknown as { detail?: string }).detail).toContain(
+        'Table row has 3 columns but header has 2',
+      )
     } else if (errors[0].errorDetail) {
       expect(errors[0].errorDetail).toContain('Table row has 3 columns but header has 2')
     } else {
@@ -38,14 +40,122 @@ describe(tableColumnIntegrity.names.join(' - '), () => {
     const errors = result.markdown
     expect(errors.length).toBe(1)
     expect(errors[0].lineNumber).toBe(3)
-    if ((errors[0] as any).detail) {
-      expect((errors[0] as any).detail).toContain('Table row has 2 columns but header has 3')
+    if ((errors[0] as unknown as { detail?: string }).detail) {
+      expect((errors[0] as unknown as { detail?: string }).detail).toContain(
+        'Table row has 2 columns but header has 3',
+      )
     } else if (errors[0].errorDetail) {
       expect(errors[0].errorDetail).toContain('Table row has 2 columns but header has 3')
     } else {
       console.log('Error structure:', JSON.stringify(errors[0], null, 2))
       expect(errors[0]).toHaveProperty('detail')
     }
+  })
+
+  test('Separator row with fewer columns than header causes error', async () => {
+    const markdown = ['| Name | Age | City |', '| --- | --- |', '| Bob | 30 | Paris |'].join('\n')
+    const result = await runRule(tableColumnIntegrity, { strings: { markdown } })
+    const errors = result.markdown
+    expect(errors.length).toBe(1)
+    expect(errors[0].lineNumber).toBe(2)
+    expect(errors[0].errorDetail).toContain('Table separator row has 2 columns but header has 3')
+  })
+
+  test('Separator row with more columns than header causes error', async () => {
+    const markdown = ['| Name | Age |', '| --- | --- | --- |', '| Bob | 30 |'].join('\n')
+    const result = await runRule(tableColumnIntegrity, { strings: { markdown } })
+    const errors = result.markdown
+    expect(errors.length).toBe(1)
+    expect(errors[0].lineNumber).toBe(2)
+    expect(errors[0].errorDetail).toContain('Table separator row has 3 columns but header has 2')
+    expect(errors[0].errorDetail).toContain(
+      'Give the header and separator rows the same number of columns',
+    )
+  })
+
+  test('Rows after a row without a closing pipe are still checked', async () => {
+    const markdown = ['| A | B |', '| --- | --- |', '| x | y', '| p | q | r |'].join('\n')
+    const result = await runRule(tableColumnIntegrity, { strings: { markdown } })
+    const errors = result.markdown
+    expect(errors.length).toBe(1)
+    expect(errors[0].lineNumber).toBe(4)
+    expect(errors[0].errorDetail).toContain('Table row has 3 columns but header has 2')
+  })
+
+  test('Tables whose header and separator lack closing pipes are checked', async () => {
+    const markdown = ['| A | B', '| --- | ---', '| p | q | r |'].join('\n')
+    const result = await runRule(tableColumnIntegrity, { strings: { markdown } })
+    const errors = result.markdown
+    expect(errors.length).toBe(1)
+    expect(errors[0].lineNumber).toBe(3)
+    expect(errors[0].errorDetail).toContain('Table row has 3 columns but header has 2')
+  })
+
+  test('Trailing HTML comments are not counted as cells', async () => {
+    const markdown = [
+      '| Option | Description |',
+      '|--------|-------------|',
+      '| `--json` | Emit JSON. | <!-- markdownlint-disable-line GHD046 -->',
+      '| `--help` | Show help. | Extra |',
+    ].join('\n')
+    const result = await runRule(tableColumnIntegrity, { strings: { markdown } })
+    const errors = result.markdown
+    expect(errors.length).toBe(1)
+    expect(errors[0].lineNumber).toBe(4)
+    expect(errors[0].errorDetail).toContain('Table row has 3 columns but header has 2')
+  })
+
+  test('Multiple trailing HTML comments are not counted as cells', async () => {
+    const markdown = [
+      '| A | B | <!-- first --> <!-- second -->',
+      '| --- | --- |',
+      '| x | y | <!-- first --> <!-- second -->',
+      '| p | q | r |',
+    ].join('\n')
+    const result = await runRule(tableColumnIntegrity, { strings: { markdown } })
+    const errors = result.markdown
+    expect(errors.length).toBe(1)
+    expect(errors[0].lineNumber).toBe(4)
+    expect(errors[0].errorDetail).toContain('Table row has 3 columns but header has 2')
+  })
+
+  test('Comment openers inside code spans do not hide cells', async () => {
+    const markdown = [
+      '| Syntax | Meaning |',
+      '| --- | --- |',
+      '| `<!--` | Starts a comment | <!-- note -->',
+    ].join('\n')
+    const result = await runRule(tableColumnIntegrity, { strings: { markdown } })
+    const errors = result.markdown
+    expect(errors.length).toBe(0)
+  })
+
+  test('Comment-only final cells without a closing pipe are counted', async () => {
+    const markdown = [
+      '| A | <!-- intentionally empty -->',
+      '| --- | --- |',
+      '| value | <!-- intentionally empty -->',
+      '| x | y |',
+      '| p | q | r |',
+    ].join('\n')
+    const result = await runRule(tableColumnIntegrity, { strings: { markdown } })
+    const errors = result.markdown
+    expect(errors.length).toBe(1)
+    expect(errors[0].lineNumber).toBe(5)
+    expect(errors[0].errorDetail).toContain('Table row has 3 columns but header has 2')
+  })
+
+  test('Valid table mixing rows with and without closing pipes passes', async () => {
+    const markdown = [
+      '| Name | Status',
+      '| ---- | ------',
+      '| Alpha | Active |',
+      '| Beta | Inactive',
+      '| Gamma | Active |',
+    ].join('\n')
+    const result = await runRule(tableColumnIntegrity, { strings: { markdown } })
+    const errors = result.markdown
+    expect(errors.length).toBe(0)
   })
 
   test('Liquid-only rows are ignored', async () => {
@@ -163,8 +273,7 @@ describe(tableColumnIntegrity.names.join(' - '), () => {
   })
 
   test('File paths with pipes are handled correctly (regression test)', async () => {
-    // This test catches the specific issue from content/actions/tutorials/build-and-test-code/python.md
-    // where the old regex /[^\\]\|/ was consuming characters before pipes and miscounting columns
+    // content/actions/tutorials/build-and-test-code/python.md exposed /[^\\]\|/ pipe miscounts.
     const markdown = [
       '| Directory | Ubuntu | macOS |',
       '|-----------|--------|-------|',
@@ -178,7 +287,6 @@ describe(tableColumnIntegrity.names.join(' - '), () => {
   })
 
   test('Complex file paths with multiple characters before pipes', async () => {
-    // Additional test to ensure the lookbehind regex works with various characters before pipes
     const markdown = [
       '| Pattern | Linux Path | Windows Path |',
       '|---------|------------|--------------|',

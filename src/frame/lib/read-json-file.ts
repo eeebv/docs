@@ -1,34 +1,27 @@
 import fs from 'fs'
 import { brotliDecompressSync } from 'zlib'
 
-// Returns parsed JSON which can be any valid JSON type
-export default function readJsonFile(xpath: string): any {
+import { createLogger } from '@/observability/logger'
+const logger = createLogger(import.meta.url)
+
+export default function readJsonFile(xpath: string): unknown {
   return JSON.parse(fs.readFileSync(xpath, 'utf8'))
 }
 
-// Returns parsed JSON which can be any valid JSON type
-export function readCompressedJsonFile(xpath: string): any {
+export function readCompressedJsonFile(xpath: string): unknown {
   if (!xpath.endsWith('.br')) {
     xpath += '.br'
   }
-  // Cast to any needed due to TypeScript's strict typing of Buffer vs expected input types for brotliDecompressSync
-  return JSON.parse(brotliDecompressSync(fs.readFileSync(xpath) as any).toString())
+  return JSON.parse(brotliDecompressSync(fs.readFileSync(xpath)).toString())
 }
 
-// Ask it to read a `foo.json` file and it will automatically
-// first see if there's a `foo.json.br` and only if it's not,
-// will fallback to reading the `foo.json` file.
-// The reason for this is that staging builds needs to as small as
-// possible (in terms of disk) for them to deploy faster. So the
-// staging deployment process will compress a bunch of large
-// `.json` files before packaging it up.
-// Returns parsed JSON which can be any valid JSON type
-export function readCompressedJsonFileFallback(xpath: string): any {
+// Staging ships large JSON as .br files to keep deployments smaller.
+// Callers pass the .json path; read .json.br first, then fall back to .json.
+export function readCompressedJsonFileFallback(xpath: string): unknown {
   try {
     return readCompressedJsonFile(xpath)
-  } catch (err: any) {
-    // err is any because fs errors can have various shapes with code property
-    if (err.code === 'ENOENT') {
+  } catch (err: unknown) {
+    if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
       return readJsonFile(xpath)
     } else {
       throw err
@@ -36,31 +29,25 @@ export function readCompressedJsonFileFallback(xpath: string): any {
   }
 }
 
-// This is used to make sure the `readCompressedJsonFileFallbackLazily()`
-// function isn't used with the same exact first argument more than once.
+// Each path gets one lazy reader; duplicate readers throw after the first read.
 const globalCacheCounter: Record<string, number> = {}
 
-// Wrapper on readCompressedJsonFileFallback that initially only checks
-// if the file exists but doesn't read the content till you call it.
-// Returns a function that returns parsed JSON which can be any valid JSON type
-export function readCompressedJsonFileFallbackLazily(xpath: string): () => any {
-  // Cache stores parsed JSON values which can be any valid JSON type
-  const cache = new Map<string, any>()
-  // This will throw if the file isn't accessible at all, e.g. ENOENT
-  // But, the file might have been replaced by one called `SAMENAME.json.br`
-  // because in staging, we ship these files compressed to make the
-  // deployment faster. So, in our file-presence check, we need to
-  // account for that.
+// Lazy reads verify file presence early but defer parsing until first use.
+export function readCompressedJsonFileFallbackLazily(xpath: string): () => unknown {
+  const cache = new Map<string, unknown>()
+  // Presence checks accept either the uncompressed file or staging's compressed .br replacement.
   try {
     fs.accessSync(xpath)
-  } catch (err: any) {
-    // err is any because fs errors can have various shapes with code property
-    if (err.code === 'ENOENT') {
+  } catch (err: unknown) {
+    if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
       try {
         fs.accessSync(`${xpath}.br`)
-      } catch (innerErr: any) {
-        // innerErr is any because fs errors can have various shapes with code property
-        if (innerErr.code === 'ENOENT') {
+      } catch (innerErr: unknown) {
+        if (
+          innerErr instanceof Error &&
+          'code' in innerErr &&
+          (innerErr as NodeJS.ErrnoException).code === 'ENOENT'
+        ) {
           throw new Error(`Neither ${xpath} nor ${xpath}.br is accessible`)
         }
         throw innerErr
@@ -73,10 +60,9 @@ export function readCompressedJsonFileFallbackLazily(xpath: string): () => any {
     if (!cache.has(xpath)) {
       cache.set(xpath, readCompressedJsonFileFallback(xpath))
       if (globalCacheCounter[xpath]) {
-        console.warn(
-          "If this happens it's because the readCompressedJsonFileFallbackLazily " +
-            'function has been called non-globally. Only use ' +
-            'readCompressedJsonFileFallback once at module-level.',
+        logger.warn(
+          'readCompressedJsonFileFallbackLazily called non-globally. Only use readCompressedJsonFileFallback once at module-level.',
+          { xpath },
         )
         throw new Error(`Globally reading the same file more than once (${xpath})`)
       }

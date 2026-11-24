@@ -1,39 +1,27 @@
 import GithubSlugger from 'github-slugger'
-import { encode } from 'html-entities'
 import { toString } from 'hast-util-to-string'
 import { visit } from 'unist-util-visit'
-
-const slugger = new GithubSlugger()
-
-// Note: Using 'any' for node because the unist/hast type system is complex and
-// the visit function's type constraints don't easily allow for proper element typing
-// without extensive type gymnastics. The runtime check ensures type safety.
-const matcher = (node: any) => node.type === 'element' && ['h2', 'h3', 'h4'].includes(node.tagName)
+import type { Element, Root } from 'hast'
 
 interface UseEnglishHeadingsOptions {
   englishHeadings?: Record<string, string>
 }
 
-// replace translated IDs and links in headings with English
+// Translated pages keep English heading IDs so inbound anchors stay stable.
 export default function useEnglishHeadings({ englishHeadings }: UseEnglishHeadingsOptions) {
   if (!englishHeadings) return
-  // Note: Using 'any' for tree because unified's AST types are complex and
-  // this function works with different tree types depending on the processor
-  return (tree: any) => {
-    // Note: Using 'any' for node because visit() callback typing is restrictive
-    // and doesn't easily allow for proper element typing without complex generics
-    visit(tree, matcher, (node: any) => {
-      slugger.reset()
-      // Get the plain text content of the heading node
+  return (tree: Root) => {
+    // One slugger per document gives repeated headings the same suffixes as the English page.
+    const slugger = new GithubSlugger()
+    visit(tree, 'element', (node: Element) => {
+      if (!['h2', 'h3', 'h4'].includes(node.tagName)) return
       const text: string = toString(node)
-      // find English heading in the collection
-      const englishHeading: string = englishHeadings[encode(text)]
-      // get English slug
+      const englishHeading: string | undefined = englishHeadings[text]
+      // Unmatched headings would otherwise register an empty slug and shift later suffixes.
+      if (!englishHeading) return
       const englishSlug: string = slugger.slug(englishHeading)
-      // use English slug for heading ID and link
       if (englishSlug) {
-        // only use English slug if there is one, otherwise we'll end up with
-        // empty IDs
+        // Leave the existing ID when no English slug exists.
         node.properties.id = englishSlug
       }
     })

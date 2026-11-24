@@ -1,0 +1,1 @@
+> [!NOTE] This feature is in {% data variables.release-phases.public_preview %}. It is only available for enterprises that use {% data variables.product.prodname_emus %} on {% data variables.product.prodname_dotcom_the_website %} or {% data variables.enterprise.data_residency %}.

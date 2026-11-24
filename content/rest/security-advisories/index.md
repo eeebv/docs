@@ -5,9 +5,7 @@ intro: Use the REST API to view and manage security advisories.
 versions:
   fpt: '*'
   ghec: '*'
-  ghes: '>=3.11'
-topics:
-  - API
+  ghes: '*'
 children:
   - /global-advisories
   - /repository-advisories

@@ -8,17 +8,84 @@ import { getLanguageCodeFromPath } from '@/languages/middleware/detect-language'
 import { pagelistValidationMiddleware } from './validation'
 import catchMiddlewareError from '@/observability/middleware/catch-middleware-error'
 import statsd from '@/observability/lib/statsd'
+import { allVersions, allVersionKeys } from '@/versions/lib/all-versions'
+import enterpriseServerReleases from '@/versions/lib/enterprise-server-releases'
+import { languages, languageKeys } from '@/languages/lib/languages'
 
 const router = express.Router()
 
-// pagelistValidationMiddleware is used for every route to normalize the lang and version from the path
+/**
+ * Get all available product versions for the docs site.
+ * @route GET /api/pagelist/versions
+ * @returns {object} JSON object with version information
+ * @example
+ * ❯ curl -s https://docs.github.com/api/pagelist/versions | jq
+ * {
+ *   "versions": ["free-pro-team@latest", "enterprise-cloud@latest", "enterprise-server@3.19", ...],
+ *   "ghesVersions": ["3.19", "3.18", "3.17", ...],
+ *   "ghesLatest": "3.19",
+ *   ...
+ * }
+ */
+router.get(
+  '/versions',
+  catchMiddlewareError(async function (req: ExtendedRequest, res: Response) {
+    defaultCacheControl(res)
 
-// If no version or lang is provided we'll assume english and fpt and redirect there
+    const response = {
+      versions: allVersionKeys,
+      ghesVersions: enterpriseServerReleases.supported,
+      ghesLatest: enterpriseServerReleases.latest,
+      ghesLatestStable: enterpriseServerReleases.latestStable,
+      ghesReleaseCandidate: enterpriseServerReleases.releaseCandidate,
+      ghesDeprecated: enterpriseServerReleases.deprecated,
+      allVersions,
+    }
+
+    res.json(response)
+  }) as RequestHandler,
+)
+
+/**
+ * Get all available languages for the docs site.
+ * @route GET /api/pagelist/languages
+ * @returns {object} JSON object with language information
+ * @example
+ * ❯ curl -s https://docs.github.com/api/pagelist/languages | jq
+ * {
+ *   "languages": ["en", "es", "ja", "pt", "zh", "ru", "fr", "ko", "de"],
+ *   "allLanguages": { ... }
+ * }
+ */
+router.get(
+  '/languages',
+  catchMiddlewareError(async function (req: ExtendedRequest, res: Response) {
+    defaultCacheControl(res)
+
+    // JSON serializes RegExp redirectPatterns as empty objects, so omit them.
+    const sanitizedLanguages = Object.fromEntries(
+      Object.entries(languages).map(([code, lang]) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { redirectPatterns, ...rest } = lang
+        return [code, rest]
+      }),
+    )
+
+    const response = {
+      languages: languageKeys,
+      allLanguages: sanitizedLanguages,
+    }
+
+    res.json(response)
+  }) as RequestHandler,
+)
+
+// Bare pagelist requests redirect to English free-pro-team@latest.
 router.get(
   '/',
   pagelistValidationMiddleware as RequestHandler,
   catchMiddlewareError(async function (req: ExtendedRequest, res: Response) {
-    res.redirect(
+    res.safeRedirect(
       308,
       req.originalUrl.replace(
         '/pagelist',
@@ -28,18 +95,17 @@ router.get(
   }),
 )
 
-// handles paths with fragments that could be the language or the version
+// One-segment pagelist requests redirect after validation finds the language or version.
 router.get(
   '/:someParam',
   pagelistValidationMiddleware as RequestHandler,
   catchMiddlewareError(async function (req: ExtendedRequest, res: Response) {
-    const { someParam } = req.params
-    res.redirect(
+    // req.originalUrl keeps raw encodings like %40, so editing it in place can redirect to itself.
+    const queryStart = req.originalUrl.indexOf('?')
+    const query = queryStart === -1 ? '' : req.originalUrl.slice(queryStart)
+    res.safeRedirect(
       308,
-      req.originalUrl.replace(
-        `/pagelist/${someParam}`,
-        `/pagelist/${req.context!.currentLanguage}/${req.context!.currentVersion}`,
-      ),
+      `${req.baseUrl}/${req.context!.currentLanguage}/${req.context!.currentVersion}${query}`,
     )
   }),
 )
@@ -68,16 +134,13 @@ router.get(
 
     const pages = req.context.pages
 
-    // the keys of `context.pages` are permalinks
     const keys = Object.keys(pages)
 
-    // we filter the permalinks to get only our target version and language
     const filteredPermalinks = keys.filter((key) =>
       versionMatcher(key, req.context!.currentVersion!, req.context!.currentLanguage!),
     )
 
-    // if we've filtered it out of existence, there's no articles to return so we must've
-    // gotten a bad language or version
+    // An empty filtered pagelist means the language or version failed validation.
     if (!filteredPermalinks.length) {
       const { lang, productVersion } = req.params
 
@@ -97,7 +160,7 @@ router.get(
     incrementPagelistLookup(req.context!.currentVersion!, req.context!.currentLanguage!)
     defaultCacheControl(res)
 
-    // new line added at the end so `wc` works as expected with `-l` and `-w`.
+    // Keep a trailing newline so wc -l counts the last path.
     res.type('text').send(filteredPermalinks.join('\n').concat('\n'))
   }),
 )

@@ -10,15 +10,22 @@ redirect_from:
 versions:
   fpt: '*'
   ghec: '*'
-topics:
-  - Identity
-  - Access management
+category:
+  - Learn about authentication
 ---
 To host your images, {% data variables.product.github %} uses the [open-source project Camo](https://github.com/atmos/camo). Camo generates an anonymous URL proxy for each file which hides your browser details and related information from other users. On {% data variables.product.prodname_dotcom_the_website %}, the URL starts `https://<subdomain>.githubusercontent.com/`, with different subdomains depending on how you uploaded the image.
 
 Videos also get anonymized URLs with the same format as image URLs, but are not processed through Camo. This is because {% data variables.product.prodname_dotcom %} does not support externally hosted videos, so the anonymized URL is a link to the uploaded video hosted by {% data variables.product.prodname_dotcom %}.
 
 Anyone who receives your anonymized URL, directly or indirectly, may view your image or video. To keep sensitive media files private, restrict them to a private network or a server that requires authentication instead of using Camo.
+
+## Removing {% data variables.product.github %}-hosted attachments
+
+Files and images hosted under `github.com/user-attachments/` are separate from the comments and pull request descriptions that link to them. Removing a link from an issue comment or pull request description does not necessarily delete the uploaded file. An image uploaded while editing a pull request description can remain available even if you remove it before saving the description.
+
+To ask about removing an uploaded attachment, contact {% data variables.contact.contact_support %}. Support may be able to help remove it even if you no longer have its original URL. After an attachment is deleted, its URL should return a 404 error.
+
+Attachment deletion is different from purging an image from Camo's cache. For more information about purging the cache, see [Removing an image from Camo's cache](#removing-an-image-from-camos-cache).
 
 ## Troubleshooting issues with Camo
 

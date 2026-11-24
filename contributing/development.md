@@ -8,11 +8,12 @@ This site is powered by Node.js! :sparkles: :turtle: :rocket: :sparkles:
 
 It runs on macOS, Windows, and Linux environments.
 
-You'll need Node.js to run the site. Check the version in `package.json`. To install Node.js, [download the "LTS" installer from nodejs.org](https://nodejs.org). If you're using [`nodenv`](https://github.com/nodenv/nodenv), read the [`nodenv` docs](https://github.com/nodenv/nodenv#readme) for instructions on switching Node.js versions.
+You'll need Node.js to run the site. Check the version in `package.json`. To install Node.js, [download the "LTS" installer from nodejs.org](https://nodejs.org). To use a Node version manager instead, see [Node versions](./node-versions.md#install-nodejs-locally).
 
 Once you've installed Node.js (which includes the popular `npm` package manager), open Terminal and run the following:
 
 ```shell
+# github/docs is public; GitHub staff should clone github/docs-internal instead
 git clone https://github.com/github/docs
 cd docs
 npm ci
@@ -32,7 +33,7 @@ Power users may want to read more about [debugging the docs application](./debug
 
 ### Using GitHub Codespaces
 
-As an alternative, you can simply use [GitHub Codespaces](https://docs.github.com/en/codespaces/quickstart). For more information about using a codespace for working on GitHub documentation, see [Working in a codespace](https://github.com/github/docs/blob/main/contributing/codespace.md).
+As an alternative, you can simply use [GitHub Codespaces](https://docs.github.com/en/codespaces/quickstart). For more information about using a codespace for working on GitHub documentation, see [Working on GitHub Docs in a codespace](https://docs.github.com/en/contributing/setting-up-your-environment-to-work-on-github-docs/working-on-github-docs-in-a-codespace).
 
 In a matter of minutes, you will be ready to edit, review and test your changes directly from the comfort of your browser.
 
@@ -40,7 +41,7 @@ In a matter of minutes, you will be ready to edit, review and test your changes 
 
 ### Enabling different languages
 
-By default the local server won't run with all supported languages enabled. If you need to run the server with a particular language, you can temporarily edit the `start` script in `package.json` and update the `ENABLED_LANGUAGES` variable. For example, to enable Japanese and Portuguese, you can set it to `ENABLED_LANGUAGES='en,ja,pt'` and then you need to restart the server for the change to take effect.
+By default the local server won't run with all supported languages enabled. If you need to run the server with a particular language, you can temporarily edit the `start` script in `package.json` and update the `ENABLED_LANGUAGES` variable. For example, to enable Japanese and Portuguese, you can set it to `ENABLED_LANGUAGES='en,ja,pt'` and then you need to restart the server for the change to take effect. If you need all languages rather than a specific set, run `npm run start-all-languages` instead, which requires no edit.
 
 The supported language codes are defined in [lib/languages.ts](../src/languages/lib/languages.ts).
 

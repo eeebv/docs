@@ -1,29 +1,56 @@
-/* Accessibility fixes for tooltip text spacing and other a11y improvements */
-
-/* Fix tooltip text spacing inheritance - Issue #11442 */
+// Tooltips inherit the user's custom text-spacing preferences for accessibility.
 .tooltipped {
   &::before,
   &::after {
-    /* Allow tooltips to inherit user's custom text spacing preferences */
     letter-spacing: inherit !important;
     word-spacing: inherit !important;
     line-height: inherit !important;
   }
+
+  // WCAG 1.4.13 requires tooltip content to stay hoverable with the mouse pointer.
+  // Primer's .tooltipped sets pointer-events: none on ::after and leaves a 6px
+  // margin gap between the trigger and tooltip, so replace the margin with a
+  // transparent border and keep the visual appearance unchanged.
+  &::after {
+    pointer-events: auto !important;
+  }
+  &.tooltipped-nw::after,
+  &.tooltipped-n::after,
+  &.tooltipped-ne::after {
+    margin-bottom: 0 !important;
+    border-bottom: 6px solid transparent;
+  }
+  &.tooltipped-sw::after,
+  &.tooltipped-s::after,
+  &.tooltipped-se::after {
+    margin-top: 0 !important;
+    border-top: 6px solid transparent;
+  }
+  &.tooltipped-w::after {
+    margin-right: 0 !important;
+    border-right: 6px solid transparent;
+  }
+  &.tooltipped-e::after {
+    margin-left: 0 !important;
+    border-left: 6px solid transparent;
+  }
 }
 
-/* Enhanced focus indicators for high contrast mode */
 @media (prefers-contrast: high) {
   .tooltipped {
     &:focus-visible::before,
     &:focus-visible::after {
-      outline: 2px solid var(--color-focus-outset);
+      // --color-focus-outset is undefined here. It invalidates the outline shorthand
+      // at computed-value time, resets the longhands, and lets outline-style: none
+      // remove the focus ring in both color modes. Use Brand's focus token to match
+      // annotate.scss.
+      outline: var(--brand-borderWidth-thick, 2px) solid
+        var(--brand-color-focus, #0377ff);
       outline-offset: 2px;
     }
   }
 }
 
-/* Responsive tooltip text for Copilot prompt links */
-/* Show long tooltip text on small screens and up (544px+) */
 .copilot-prompt-long {
   display: none;
   visibility: hidden;
@@ -34,7 +61,6 @@
   }
 }
 
-/* Show short tooltip text only on extra small screens (below 544px) */
 .copilot-prompt-short {
   display: inline-block;
   visibility: visible;

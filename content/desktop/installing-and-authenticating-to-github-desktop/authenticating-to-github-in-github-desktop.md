@@ -12,12 +12,18 @@ versions:
   fpt: '*'
   ghec: '*'
   ghes: '*'
+category:
+  - Set up GitHub Desktop
 ---
 ## About authentication
 
 To keep your account secure, you must authenticate before you can use {% data variables.product.prodname_desktop %} to access resources on {% data variables.product.github %}.
 
+{% data variables.product.prodname_desktop %} uses short-lived tokens when you authenticate to {% data variables.product.prodname_dotcom_the_website %}. This improves security by limiting how long a compromised token can be used.
+
 Before you authenticate, {% data reusables.desktop.get-an-account %}
+
+You can sign in to more than one account on the same host, such as a personal account and a work account on {% data variables.product.prodname_dotcom_the_website %}. For more information, see [AUTOTITLE](/desktop/installing-and-authenticating-to-github-desktop/using-multiple-accounts-in-github-desktop).
 
 {% mac %}
 

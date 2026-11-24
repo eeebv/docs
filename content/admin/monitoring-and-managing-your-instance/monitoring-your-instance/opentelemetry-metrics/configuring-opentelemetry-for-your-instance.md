@@ -1,21 +1,15 @@
 ---
 title: Configuring OpenTelemetry for your instance
-intro: 'Learn how to configure OpenTelemetry metrics collection on your {% data variables.product.prodname_ghe_server %} instance for enhanced monitoring and observability.'
+intro: Learn how to configure OpenTelemetry metrics collection on your {% data variables.product.prodname_ghe_server %} instance for enhanced monitoring and observability.
 versions:
   feature: ghes-opentelemetry
-topics:
-  - Enterprise
-  - Fundamentals
-  - Infrastructure
-  - Monitoring
-  - Performance
-type: how_to
 shortTitle: Configure OpenTelemetry
+contentType: how-tos
+category:
+  - Monitor and audit your enterprise
 ---
 
 {% data reusables.enterprise.opentelemetry-migration %}
-
-{% data reusables.enterprise.opentelemetry-preview %}
 
 ## Prerequisites
 
@@ -25,7 +19,9 @@ shortTitle: Configure OpenTelemetry
 
 ## Enabling OpenTelemetry metrics
 
-OpenTelemetry metrics are disabled by default. You can enable them through the {% data variables.enterprise.management_console %} or command line.
+{% ifversion ghes-collectd-available %}
+
+OpenTelemetry metrics are enabled by default for **new installations** of {% data variables.product.prodname_ghe_server %} 3.19 and later. Upgrades from versions earlier than 3.21 to 3.21 or 3.22 also enable OpenTelemetry and disable collectd. For the migration timeline and the procedure for instances that still use collectd, see [AUTOTITLE](/admin/monitoring-and-managing-your-instance/monitoring-your-instance/opentelemetry-metrics/migration-guidance).
 
 ### Using the {% data variables.enterprise.management_console %}
 
@@ -43,9 +39,15 @@ OpenTelemetry metrics are disabled by default. You can enable them through the {
 
    ```shell
    ghe-config observability.metrics.next-enabled true
-    ```
+   ```
 
 {% data reusables.enterprise.apply-configuration %}
+
+{% else %}
+
+OpenTelemetry metrics are always enabled and are the only supported metrics stack. Collectd is retired in {% data variables.product.prodname_ghe_server %} 3.23 and later, and upgrading from an earlier version disables it. For information about post-upgrade checks and historical collectd data, see [AUTOTITLE](/admin/monitoring-and-managing-your-instance/monitoring-your-instance/opentelemetry-metrics/migration-guidance).
+
+{% endif %}
 
 ## Performance considerations
 
@@ -157,5 +159,6 @@ sudo journalctl -u victoriametrics -f
 
 ## Next steps
 
-* To enable advanced monitoring dashboards, see [AUTOTITLE](/admin/monitoring-and-managing-your-instance/monitoring-your-instance/opentelemetry-metrics/enable-advanced-dashboards)
+* To enable advanced monitoring dashboards, see [AUTOTITLE](/admin/monitoring-and-managing-your-instance/monitoring-your-instance/opentelemetry-metrics/advanced-dashboards)
+* To explore OpenTelemetry metrics, see [AUTOTITLE](/admin/monitoring-and-managing-your-instance/monitoring-your-instance/opentelemetry-metrics/using-grafana-to-analyze-opentelemetry-metrics)
 * To set up external monitoring, see [AUTOTITLE](/admin/monitoring-and-managing-your-instance/monitoring-your-instance/opentelemetry-metrics/setting-up-external-monitoring-with-opentelemetry).

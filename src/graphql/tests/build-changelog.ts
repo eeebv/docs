@@ -1,14 +1,17 @@
 import fs from 'fs/promises'
 
 import { afterEach, describe, expect, test } from 'vitest'
-import yaml from 'js-yaml'
+import { load } from 'js-yaml'
 import MockDate from 'mockdate'
+import type { Change } from '@graphql-inspector/core'
 
 import {
   createChangelogEntry,
   cleanPreviewTitle,
+  cleanMessagesFromChanges,
   previewAnchor,
   prependDatedEntry,
+  ensureYearPage,
   getLastIgnoredChanges,
   getIgnoredChangesSummary,
   type ChangelogEntry,
@@ -19,8 +22,8 @@ interface Preview {
   title: string
   description: string
   toggled_by: string
-  announcement: any
-  updates: any
+  announcement: unknown
+  updates: unknown
   toggled_on: string[]
   owning_teams: string[]
 }
@@ -33,7 +36,7 @@ interface UpcomingChange {
 
 interface IgnoredChange {
   type: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface IgnoredChangesSummary {
@@ -58,8 +61,6 @@ describe('creating a changelog from old schema and new schema', () => {
   })
 
   test('ignores unknown change types without throwing errors', async () => {
-    // Create a minimal test that would generate an unknown change type
-    // This test ensures the system gracefully handles new change types
     const oldSchemaString = `
     type Query {
       field: String
@@ -75,8 +76,7 @@ describe('creating a changelog from old schema and new schema', () => {
     }
     `
 
-    // This should generate TypeDescriptionAdded change type
-    // which should be silently ignored if not in CHANGES_TO_REPORT
+    // CHANGES_TO_REPORT omits TypeDescriptionAdded, so createChangelogEntry ignores it.
     const entry: ChangelogEntry | null = await createChangelogEntry(
       oldSchemaString,
       newSchemaString,
@@ -85,14 +85,10 @@ describe('creating a changelog from old schema and new schema', () => {
       [],
     )
 
-    // Should return null since TypeDescriptionAdded is not in CHANGES_TO_REPORT
-    // and will be silently ignored without throwing an error
     expect(entry).toBeNull()
   })
 
   test('handles new directive usage change types gracefully', async () => {
-    // Test that verifies the system can handle new directive-related change types
-    // that were previously causing errors in the pipeline
     const oldSchemaString = `
     directive @example on FIELD_DEFINITION
 
@@ -109,8 +105,7 @@ describe('creating a changelog from old schema and new schema', () => {
     }
     `
 
-    // This should generate DirectiveUsage* change types that are not in CHANGES_TO_REPORT
-    // The system should silently ignore these and not throw errors
+    // CHANGES_TO_REPORT omits added field directives, so createChangelogEntry ignores this one.
     const entry: ChangelogEntry | null = await createChangelogEntry(
       oldSchemaString,
       newSchemaString,
@@ -119,7 +114,6 @@ describe('creating a changelog from old schema and new schema', () => {
       [],
     )
 
-    // Should return null since directive usage changes are typically ignored
     expect(entry).toBeNull()
   })
 
@@ -157,7 +151,7 @@ describe('creating a changelog from old schema and new schema', () => {
     }
     `
 
-    const previews = yaml.load(`
+    const previews = load(`
 - title: Test preview
   description: This preview is just for test
   toggled_by: ':test_preview'
@@ -170,7 +164,7 @@ describe('creating a changelog from old schema and new schema', () => {
     - '@github/engineering'
 `) as Preview[]
 
-    const oldUpcomingChanges = yaml.load(`
+    const oldUpcomingChanges = load(`
 upcoming_changes:
   - location: EnterprisePendingCollaboratorEdge.isUnlicensed
     description: '\`isUnlicensed\` will be removed.'
@@ -178,7 +172,7 @@ upcoming_changes:
 `) as { upcoming_changes: UpcomingChange[] }
     const oldUpcomingChangesArray: UpcomingChange[] = oldUpcomingChanges.upcoming_changes
 
-    const newUpcomingChanges = yaml.load(`
+    const newUpcomingChanges = load(`
 upcoming_changes:
   - location: Query.stableField
     description: '\`stableField\` will be removed.'
@@ -214,22 +208,102 @@ upcoming_changes:
     )
     expect(nullEntry).toBeNull()
   })
+
+  test('omits the schema changes group when only upcoming changes exist', async () => {
+    const schemaString = `
+    type Query {
+      i: Int!
+    }`
+
+    const entry: ChangelogEntry | null = await createChangelogEntry(
+      schemaString,
+      schemaString,
+      [],
+      [],
+      [
+        {
+          location: 'Query.i',
+          description: '`i` will be removed.',
+          date: '2021-06-01T00:00:00+00:00',
+        },
+      ],
+    )
+    expect(entry).not.toBeNull()
+    expect(entry!.schemaChanges).toEqual([])
+    expect(entry!.upcomingChanges).toHaveLength(1)
+  })
+
+  test('omits the schema changes group when only preview changes exist', async () => {
+    const oldSchemaString = `
+    type PreviewType {
+      a: Int
+    }
+
+    type Query {
+      previewField: PreviewType
+    }`
+
+    const newSchemaString = `
+    type PreviewType {
+      a: Int
+      b: Int
+    }
+
+    type Query {
+      previewField: PreviewType
+    }`
+
+    const previews = [
+      {
+        title: 'Test preview',
+        toggled_on: ['PreviewType'],
+      },
+    ]
+
+    const entry: ChangelogEntry | null = await createChangelogEntry(
+      oldSchemaString,
+      newSchemaString,
+      previews,
+      [],
+      [],
+    )
+    expect(entry).not.toBeNull()
+    expect(entry!.schemaChanges).toEqual([])
+    expect(entry!.previewChanges).toHaveLength(1)
+  })
 })
 
 describe('Preparing preview links', () => {
   test('fixes preview names', () => {
-    // These two are special cases
+    // UpdateRefsPreview and MergeInfoPreview are hand-written title exceptions.
     expect(cleanPreviewTitle('UpdateRefsPreview')).toEqual('Update refs preview')
     expect(cleanPreviewTitle('MergeInfoPreview')).toEqual('Merge info preview')
-    // Previews that don't end in " preview" have it added
     expect(cleanPreviewTitle('something interesting')).toEqual('something interesting preview')
-    // Other things are left as-is
     expect(cleanPreviewTitle('nice preview')).toEqual('nice preview')
   })
 
   test('creates anchors from preview titles', () => {
     expect(previewAnchor('Merge info preview')).toEqual('merge-info-preview')
     expect(previewAnchor('some.punct123 preview')).toEqual('somepunct123-preview')
+  })
+})
+
+describe('cleaning change messages', () => {
+  test('wraps each quoted name in its own code span', () => {
+    const messages = [
+      "Enum value 'CREATED_AT' was added to enum 'IssueRelatesToOrderField'",
+      "Input field 'botIds' of type '[ID!]' was added to input object type 'RerequestReviewsInput'",
+      "Argument 'ids: [ID!]' added to field 'Query.f'",
+      "Type 'ProjectV2Field' was added",
+    ]
+    const changes = messages.map((message) => ({ message }) as Change)
+
+    expect(cleanMessagesFromChanges(changes)).toEqual([
+      'Enum value `CREATED_AT` was added to enum `IssueRelatesToOrderField`',
+      'Input field `botIds` of type `[ID!]` was added to input object type `RerequestReviewsInput`',
+      'Argument `ids: [ID!]` added to field `Query.f`',
+      'Type `ProjectV2Field` was added',
+    ])
   })
 })
 
@@ -252,7 +326,6 @@ describe('updating the changelog file', () => {
 
     prependDatedEntry(exampleEntry, testTargetPath)
     const newContents: string = await fs.readFile(testTargetPath, 'utf8')
-    // reset the file:
     await fs.writeFile(testTargetPath, previousContents.toString())
 
     expect(exampleEntry).toEqual({
@@ -262,6 +335,46 @@ describe('updating the changelog file', () => {
       date: expectedDate,
     })
     expect(JSON.parse(newContents)).toEqual(expectedUpdatedChangelogFile)
+  })
+})
+
+describe('ensureYearPage', () => {
+  const tmpDir = 'src/graphql/tests/fixtures/tmp-changelog'
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true })
+  })
+
+  test('creates a new year page and updates index.md children', async () => {
+    await fs.mkdir(tmpDir, { recursive: true })
+    await fs.writeFile(
+      `${tmpDir}/index.md`,
+      ['---', 'title: Changelog', 'children:', '  - /2026', '  - /2025', '---', ''].join('\n'),
+    )
+
+    ensureYearPage('2027', tmpDir)
+
+    const yearPage = await fs.readFile(`${tmpDir}/2027.md`, 'utf8')
+    expect(yearPage).toContain('title: "GraphQL changelog for 2027"')
+    expect(yearPage).toContain('shortTitle: "2027"')
+    expect(yearPage).toContain('autogenerated: graphql')
+
+    const indexContent = await fs.readFile(`${tmpDir}/index.md`, 'utf8')
+    expect(indexContent).toContain('  - /2027\n  - /2026')
+  })
+
+  test('is a no-op when the year page already exists', async () => {
+    await fs.mkdir(tmpDir, { recursive: true })
+    const indexContent = ['---', 'children:', '  - /2026', '---', ''].join('\n')
+    await fs.writeFile(`${tmpDir}/index.md`, indexContent)
+    await fs.writeFile(`${tmpDir}/2026.md`, '---\ntitle: existing\n---\n')
+
+    ensureYearPage('2026', tmpDir)
+
+    const yearPage = await fs.readFile(`${tmpDir}/2026.md`, 'utf8')
+    expect(yearPage).toContain('title: existing')
+    const updatedIndex = await fs.readFile(`${tmpDir}/index.md`, 'utf8')
+    expect(updatedIndex).toBe(indexContent)
   })
 })
 
@@ -282,10 +395,10 @@ describe('ignored changes tracking', () => {
     }
     `
 
-    // This should generate a TypeDescriptionAdded change type that gets ignored
+    // Ignored-change tracking records TypeDescriptionAdded.
     await createChangelogEntry(oldSchemaString, newSchemaString, [], [], [])
 
-    const ignoredChanges: IgnoredChange[] = getLastIgnoredChanges()
+    const ignoredChanges: IgnoredChange[] = getLastIgnoredChanges() as unknown as IgnoredChange[]
     expect(ignoredChanges.length).toBe(1)
     expect(ignoredChanges[0].type).toBe('TYPE_DESCRIPTION_ADDED')
   })
@@ -307,7 +420,7 @@ describe('ignored changes tracking', () => {
     }
     `
 
-    // This should generate multiple DirectiveUsage changes that get ignored
+    // Ignored-change summary groups multiple DirectiveUsage changes under one type.
     await createChangelogEntry(oldSchemaString, newSchemaString, [], [], [])
 
     const summary = getIgnoredChangesSummary()
@@ -326,7 +439,6 @@ describe('ignored changes tracking', () => {
     }
     `
 
-    // No changes should be generated
     await createChangelogEntry(schemaString, schemaString, [], [], [])
 
     const summary = getIgnoredChangesSummary()

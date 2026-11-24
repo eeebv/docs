@@ -5,16 +5,12 @@ intro: Check the size of the allowance for usage-based products included in each
 versions:
   fpt: '*'
   ghec: '*'
-topics:
-  - Billing
-  - Actions
-  - Codespaces
-  - Packages
-  - LFS
 contentType: reference
+category:
+  - Get started with billing
 ---
 
-The table below shows the usage available in each plan. When you exceed these amounts, you'll be charged for additional usage unless you've set a budget with the setting "Stop usage when budget limit is reached" enabled. For more information, see [AUTOTITLE](/billing/tutorials/set-up-budgets).
+The table below shows the usage available in each plan. When you exceed these amounts, you'll be charged for additional usage unless you've set a budget with the setting "Stop usage when budget limit is reached" enabled. For more information, see [AUTOTITLE](/billing/how-tos/set-up-budgets).
 
 <table>
   <tr>
@@ -36,12 +32,12 @@ The table below shows the usage available in each plan. When you exceed these am
     <td>50 GB</td>
   </tr>
   <tr>
-    <th><b>Minutes (per month)</b></th>
-    <td>2,000</td>
-    <td>3,000</td>
-    <td>2,000</td>
-    <td>3,000</td>
-    <td>50,000</td>
+    <th><b>Included compute usage (per month)</b></th>
+    <td>$12 USD</td>
+    <td>$18 USD</td>
+    <td>$12 USD</td>
+    <td>$18 USD</td>
+    <td>$300 USD</td>
   </tr>
    <tr>
     <th rowspan="2" scope="rowgroup"><b>{% data variables.product.prodname_github_codespaces %}</b></th>
@@ -97,4 +93,13 @@ The table below shows the usage available in each plan. When you exceed these am
 </table>
 
 > [!TIP]
-> For information about included requests for {% data variables.product.prodname_copilot %} plans, see [AUTOTITLE](/copilot/about-github-copilot/plans-for-github-copilot).
+> You can receive email notifications when your included usage reaches 90% and 100% during a billing period. To opt in, see [AUTOTITLE](/billing/how-tos/set-up-budgets#managing-included-usage-alerts).
+
+The included compute usage is expressed as a monetary amount, not a quantity of minutes or other usage units. On all plans, the calculated cost of the following usage can draw from this amount:
+
+* Standard {% data variables.actions.github_hosted_runners %} for private or internal repositories.
+* Cloud sandbox compute and memory.
+
+Where {% data variables.actions.hosted_runners %} are available, their cost can also draw from the included compute usage. This applies to billing accounts on {% data variables.product.prodname_team %} and {% data variables.product.prodname_ghe_cloud %}. For more information, see [AUTOTITLE](/billing/concepts/product-billing/github-actions).
+
+For information about included requests for {% data variables.product.prodname_copilot %} plans, see [AUTOTITLE](/copilot/get-started/plans).

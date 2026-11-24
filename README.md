@@ -1,6 +1,7 @@
 # GitHub Docs <!-- omit in toc -->
 
-Welcome to GitHub Docs! GitHub’s documentation is open source, meaning anyone from inside or outside the company can contribute. For full contributing guidelines, visit our [contributing guide](https://docs.github.com/en/contributing)
+Welcome to GitHub Docs! GitHub’s documentation is open source, meaning anyone from inside or outside the company can contribute. For full contributing guidelines, visit our [contributing guide](https://docs.github.com/en/contributing).
+
 
 ## Quick links by contributor type
 
@@ -27,7 +28,7 @@ Here are some resources to help you get started with open source contributions:
 * [Finding ways to contribute to open source on GitHub](https://docs.github.com/en/get-started/exploring-projects-on-github/finding-ways-to-contribute-to-open-source-on-github)
 * [Set up Git](https://docs.github.com/en/get-started/git-basics/set-up-git)
 * [GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow)
-* [Collaborating with pull requests](https://docs.github.com/en/github/collaborating-with-pull-requests)
+* [How we use pull requests on Docs](https://docs.github.com/en/contributing/collaborating-on-github-docs/about-contributing-to-github-docs#pull-requests)
 
 ## License
 

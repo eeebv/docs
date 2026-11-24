@@ -11,8 +11,6 @@ redirect_from:
   - /admin/monitoring-managing-and-updating-your-instance/configuring-clustering
 versions:
   ghes: '*'
-topics:
-  - Enterprise
 children:
   - /about-clustering
   - /differences-between-clustering-and-high-availability-ha
@@ -25,6 +23,7 @@ children:
   - /monitoring-the-health-of-your-cluster-nodes-with-node-eligibility-service
   - /rebalancing-cluster-workloads
   - /replacing-a-cluster-node
+  - /moving-redis-to-a-dedicated-cluster-node
   - /configuring-high-availability-replication-for-a-cluster
   - /initiating-a-failover-to-your-replica-cluster
 ---

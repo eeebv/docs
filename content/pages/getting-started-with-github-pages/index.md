@@ -11,14 +11,13 @@ versions:
   fpt: '*'
   ghes: '*'
   ghec: '*'
-topics:
-  - Pages
 children:
   - /what-is-github-pages
   - /creating-a-github-pages-site
   - /github-pages-limits
   - /using-custom-workflows-with-github-pages
   - /configuring-a-publishing-source-for-your-github-pages-site
+  - /about-privately-published-github-pages-sites
   - /deleting-a-github-pages-site
   - /unpublishing-a-github-pages-site
   - /changing-the-visibility-of-your-github-pages-site

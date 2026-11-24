@@ -1,52 +1,94 @@
 import React from 'react'
-import cx from 'classnames'
+import cx from 'clsx'
+import GithubSlugger from 'github-slugger'
 
 import { HeadingLink } from '@/frame/components/article/HeadingLink'
+import { Link } from '@/frame/components/Link'
+import { RenderedHTML } from '@/frame/components/ui/RenderedHTML/RenderedHTML'
 import { ChangelogItemT } from './types'
 import styles from '@/frame/components/ui/MarkdownContent/MarkdownContent.module.scss'
 
 type Props = {
   changelogItems: ChangelogItemT[]
+  years?: number[]
+  currentYear?: number
 }
 
-export function Changelog({ changelogItems }: Props) {
-  const changes = changelogItems.map((item) => {
+function YearNav({ years, currentYear }: { years: number[]; currentYear: number }) {
+  return (
+    <nav aria-label="Changelog years" className="d-flex flex-wrap mb-4">
+      {years.map((year) =>
+        year === currentYear ? (
+          <span key={year} className="text-bold mr-3">
+            {year}
+          </span>
+        ) : (
+          <Link
+            key={year}
+            className="mr-3"
+            href={`/graphql/overview/changelog/${year}`}
+            makeAbsolute
+          >
+            {year}
+          </Link>
+        ),
+      )}
+    </nav>
+  )
+}
+
+export function Changelog({ changelogItems, years, currentYear }: Props) {
+  const slugger = new GithubSlugger()
+
+  const changes = changelogItems.map((item, index) => {
     const heading = `Schema changes for ${item.date}`
+    const slug = slugger.slug(heading)
 
     return (
-      <div key={item.date}>
-        <HeadingLink as="h2">{heading}</HeadingLink>
-        {(item.schemaChanges || []).map((change, index) => (
-          <React.Fragment key={index}>
+      <div key={`${item.date}-${index}`}>
+        <HeadingLink as="h2" slug={slug}>
+          {heading}
+        </HeadingLink>
+        {(item.schemaChanges || [])
+          .filter((change) => change.changes.length > 0)
+          .map((change, changeIndex) => (
+            <React.Fragment key={changeIndex}>
+              <p>{change.title}</p>
+              <ul>
+                {change.changes.map((changeItem) => (
+                  <RenderedHTML as="li" key={changeItem} html={changeItem} />
+                ))}
+              </ul>
+            </React.Fragment>
+          ))}
+        {(item.previewChanges || []).map((change, changeIndex) => (
+          <React.Fragment key={changeIndex}>
             <p>{change.title}</p>
             <ul>
               {change.changes.map((changeItem) => (
-                <li key={changeItem} dangerouslySetInnerHTML={{ __html: changeItem }} />
+                <RenderedHTML as="li" key={changeItem} html={changeItem} />
               ))}
             </ul>
           </React.Fragment>
         ))}
-        {(item.previewChanges || []).map((change, index) => (
-          <React.Fragment key={index}>
+        {(item.upcomingChanges || []).map((change, changeIndex) => (
+          <React.Fragment key={changeIndex}>
             <p>{change.title}</p>
             <ul>
               {change.changes.map((changeItem) => (
-                <li key={changeItem} dangerouslySetInnerHTML={{ __html: changeItem }} />
+                <RenderedHTML as="li" key={changeItem} html={changeItem} />
               ))}
             </ul>
-          </React.Fragment>
-        ))}
-        {(item.upcomingChanges || []).map((change, index) => (
-          <React.Fragment key={index}>
-            <p>{change.title}</p>
-            {change.changes.map((changeItem) => (
-              <li key={changeItem} dangerouslySetInnerHTML={{ __html: changeItem }} />
-            ))}
           </React.Fragment>
         ))}
       </div>
     )
   })
 
-  return <div className={cx(styles.markdownBody)}>{changes}</div>
+  return (
+    <div className={cx(styles.markdownBody)}>
+      {years && currentYear && <YearNav years={years} currentYear={currentYear} />}
+      {changes}
+    </div>
+  )
 }

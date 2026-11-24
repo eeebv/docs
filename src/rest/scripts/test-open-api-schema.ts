@@ -1,16 +1,12 @@
-// [start-readme]
-//
-// Run this script to check if OpenAPI operations match versions in content/rest operations
-//
-// [end-readme]
+// Checks whether OpenAPI operations match content/rest version frontmatter.
 import fs from 'fs'
 import path from 'path'
-import _ from 'lodash'
+import { isEqual } from 'lodash-es'
 
 import frontmatter from '@/frame/lib/read-frontmatter'
 import getApplicableVersions from '@/versions/lib/get-applicable-versions'
 import { allVersions, getDocsVersion } from '@/versions/lib/all-versions'
-import { REST_DATA_DIR, REST_SCHEMA_FILENAME } from '../lib/index'
+import { REST_DATA_DIR } from '../lib/index'
 import { nonAutomatedRestPaths } from '../lib/config'
 import { deprecated } from '@/versions/lib/enterprise-server-releases'
 import walkFiles from '@/workflows/walk-files'
@@ -23,13 +19,10 @@ type ErrorMessages = Record<string, Record<string, { contentDir: string[]; openA
 
 export async function getDiffOpenAPIContentRest(): Promise<ErrorMessages> {
   const contentFiles = getAutomatedMarkdownFiles('content/rest')
-  // Creating the categories/subcategories based on the current content directory
   const checkContentDir = await createCheckContentDirectory(contentFiles)
 
-  // Create categories/subcategories from OpenAPI Schemas
   const openAPISchemaCheck = await createOpenAPISchemasCheck()
 
-  // Get Differences between categories/subcategories from dereferenced schemas and the content/rest directory frontmatter versions
   const differences = getDifferences(openAPISchemaCheck, checkContentDir)
   const errorMessages: ErrorMessages = {}
 
@@ -54,17 +47,21 @@ async function createOpenAPISchemasCheck(): Promise<CheckObject> {
   const restDirectory = fs
     .readdirSync(REST_DATA_DIR)
     .filter((dir) => !dir.endsWith('.json'))
-    // Allow the most recent deprecation to exist on disk until fully deprecated
+    // Skip the most recently deprecated GitHub Enterprise Server data, which stays on disk until deprecation finishes.
     .filter((dir) => !dir.includes(deprecated[0]))
 
   for (const dir of restDirectory) {
-    const filename = path.join(REST_DATA_DIR, dir, REST_SCHEMA_FILENAME)
-    const fileSchema = JSON.parse(fs.readFileSync(filename, 'utf8'))
-    const categories = Object.keys(fileSchema).sort()
+    const dirPath = path.join(REST_DATA_DIR, dir)
+    const categoryFiles = fs
+      .readdirSync(dirPath)
+      .filter((f) => f.endsWith('.json') && f !== 'schema.json')
     const version = getDocsVersion(dir)
 
-    for (const category of categories) {
-      const subcategories = Object.keys(fileSchema[category]) as string[]
+    for (const categoryFile of categoryFiles) {
+      const category = categoryFile.replace('.json', '')
+      const categoryData = JSON.parse(fs.readFileSync(path.join(dirPath, categoryFile), 'utf8'))
+      const subcategories = Object.keys(categoryData) as string[]
+
       if (isApiVersioned(version)) {
         for (const apiVersion of getOnlyApiVersions(version)) {
           openAPICheck[apiVersion][category] = subcategories.sort()
@@ -88,7 +85,7 @@ async function createCheckContentDirectory(contentFiles: string[]): Promise<Chec
     const subCategory = splitPath[splitPath.length - 1].replace('.md', '')
     const category =
       splitPath[splitPath.length - 2] === 'rest' ? subCategory : splitPath[splitPath.length - 2]
-    // All versions with appended calendar date versions if it exists
+    // Expand each docs version to its calendar-date API versions when present.
     const allCompleteVersions = applicableVersions.flatMap((version) => {
       return isApiVersioned(version)
         ? allVersions[version].apiVersions.map(
@@ -152,7 +149,7 @@ function difference(obj1: Record<string, string[]>, obj2: Record<string, string[
   const diff = Object.keys(obj1).reduce((result, key) => {
     if (!Object.prototype.hasOwnProperty.call(obj2, key)) {
       result.push(key)
-    } else if (_.isEqual(obj1[key], obj2[key])) {
+    } else if (isEqual(obj1[key], obj2[key])) {
       const resultKeyIndex = result.indexOf(key)
       result.splice(resultKeyIndex, 1)
     }

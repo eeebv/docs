@@ -1,11 +1,8 @@
-// See also languages-schema.ts
-// Nota bene: If you are adding a new language,
-// change accept-language handling in CDN config as well.
+// When adding a language, also update CDN accept-language handling.
+// src/languages/tests/files.ts validates each entry.
 
-/**
- * Client-safe language definitions without server-side dependencies.
- * For server-side usage with fs/path operations, import from './languages-server.ts'
- */
+// Client-safe definitions avoid fs and path; server code that needs directories
+// imports languages-server.ts.
 
 export type LanguageCode = 'en' | 'es' | 'ja' | 'pt' | 'zh' | 'ru' | 'fr' | 'ko' | 'de'
 export type LocaleCode =
@@ -27,14 +24,18 @@ export interface Language {
   locale: LocaleCode
   redirectPatterns?: RegExp[]
   dir?: string
+  // The earliest archived GHES version that includes this language.
+  // Use it to short-circuit requests for translations missing from older archives.
+  // English has no value because every archive includes it.
+  firstArchivedVersion?: string
 }
 
 export interface Languages {
   [code: string]: Language
 }
 
-// Languages in order of accept-language header frequency
-// Note: 'dir' is omitted here as it requires server-side path resolution
+// Order languages by accept-language header frequency. Omit dir because path
+// resolution needs server-only modules.
 export const languages: Languages = {
   en: {
     name: 'English',
@@ -48,6 +49,7 @@ export const languages: Languages = {
     code: 'es',
     hreflang: 'es',
     locale: 'es-es',
+    firstArchivedVersion: '3.0',
   },
   ja: {
     name: 'Japanese',
@@ -56,6 +58,7 @@ export const languages: Languages = {
     hreflang: 'ja',
     redirectPatterns: [/^\/jp/],
     locale: 'ja-jp',
+    firstArchivedVersion: '3.0',
   },
   pt: {
     name: 'Portuguese',
@@ -64,14 +67,17 @@ export const languages: Languages = {
     hreflang: 'pt',
     redirectPatterns: [/^\/br/],
     locale: 'pt-br',
+    firstArchivedVersion: '3.0',
   },
   zh: {
     name: 'Simplified Chinese',
     nativeName: '简体中文',
     code: 'zh',
     hreflang: 'zh-Hans',
-    redirectPatterns: [/^\/cn/, /^\/zh-\w{2}/],
+    // Match the whole first segment, so /zh-Hans/get-started becomes /zh/get-started.
+    redirectPatterns: [/^\/cn/, /^\/zh-[\w-]+(?=\/|$)/],
     locale: 'zh-cn',
+    firstArchivedVersion: '3.3',
   },
   ru: {
     name: 'Russian',
@@ -79,6 +85,7 @@ export const languages: Languages = {
     code: 'ru',
     hreflang: 'ru',
     locale: 'ru-ru',
+    firstArchivedVersion: '3.3',
   },
   fr: {
     name: 'French',
@@ -86,6 +93,7 @@ export const languages: Languages = {
     code: 'fr',
     hreflang: 'fr',
     locale: 'fr-fr',
+    firstArchivedVersion: '3.3',
   },
   ko: {
     name: 'Korean',
@@ -94,6 +102,7 @@ export const languages: Languages = {
     hreflang: 'ko',
     redirectPatterns: [/^\/kr/],
     locale: 'ko-kr',
+    firstArchivedVersion: '3.3',
   },
   de: {
     name: 'German',
@@ -101,6 +110,7 @@ export const languages: Languages = {
     code: 'de',
     hreflang: 'de',
     locale: 'de-de',
+    firstArchivedVersion: '3.3',
   },
 }
 

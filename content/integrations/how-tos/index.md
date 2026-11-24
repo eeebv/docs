@@ -6,10 +6,9 @@ versions:
   fpt: '*'
   ghes: '*'
   ghec: '*'
-topics:
-  - Integration
 children:
     - /slack
+    - /teams
+    - /using-github-event-streams
 contentType: how-tos
 ---
-

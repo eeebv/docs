@@ -1,4 +1,3 @@
-// eslint-disable-next-line import/no-extraneous-dependencies
 import { graphql } from '@octokit/graphql'
 
 import {
@@ -9,12 +8,46 @@ import {
   generateUpdateProjectV2ItemFieldMutation,
 } from './projects'
 
+interface PRNode {
+  id: string
+  isDraft: boolean
+  reviewRequests: { nodes: Array<{ requestedReviewer: { name: string } | null }> }
+  labels: { nodes: Array<{ name: string }> }
+  reviews: { nodes: Array<{ onBehalfOf: { nodes: Array<{ name: string }> } }> }
+  author: { login: string }
+}
+
+interface PRQueryResponse {
+  repository: {
+    pullRequests: {
+      pageInfo: { startCursor: string; hasPreviousPage: boolean }
+      nodes: PRNode[]
+    }
+  }
+}
+
+interface ProjectQueryResponse {
+  organization: {
+    projectV2: {
+      id: string
+      items: { nodes: Array<{ id: string }> }
+      fields: {
+        nodes: Array<{
+          id: string
+          name: string
+          options?: Array<{ id: string; name: string }>
+        }>
+      }
+    }
+  }
+}
+
 async function getAllOpenPRs() {
   let prsRemaining = true
   let cursor
-  let prData: any[] = []
+  let prData: PRNode[] = []
   while (prsRemaining) {
-    const data: Record<string, any> = await graphql(
+    const data: PRQueryResponse = await graphql<PRQueryResponse>(
       `
         query ($organization: String!, $repo: String!) {
           repository(name: $repo, owner: $organization) {
@@ -72,25 +105,22 @@ async function getAllOpenPRs() {
 }
 
 async function run() {
-  // Get info about open github/github PRs
   const prData = await getAllOpenPRs()
 
-  // Get the PRs that are:
-  // - not draft
-  // - not a train
-  // - are requesting a review by docs-reviewers
-  // - have not already been reviewed on behalf of docs-reviewers
+  // Keep PRs that still need the requested docs-reviewers review.
   const prs = prData.filter(
     (pr) =>
       !pr.isDraft &&
-      !pr.labels.nodes.find((label: Record<string, any>) => label.name === 'Deploy train 🚂') &&
+      !pr.labels.nodes.find((label: { name: string }) => label.name === 'Deploy train 🚂') &&
       pr.reviewRequests.nodes.find(
-        (requestedReviewers: Record<string, any>) =>
+        (requestedReviewers: { requestedReviewer: { name: string } | null }) =>
           requestedReviewers.requestedReviewer?.name === process.env.REVIEWER,
       ) &&
       !pr.reviews.nodes
-        .flatMap((review: Record<string, any>) => review.onBehalfOf.nodes)
-        .find((behalf: Record<string, any>) => behalf.name === process.env.REVIEWER),
+        .flatMap(
+          (review: { onBehalfOf: { nodes: Array<{ name: string }> } }) => review.onBehalfOf.nodes,
+        )
+        .find((behalf: { name: string }) => behalf.name === process.env.REVIEWER),
   )
   if (prs.length === 0) {
     console.log('No PRs found. Exiting.')
@@ -101,8 +131,7 @@ async function run() {
   const prAuthors = prs.map((pr) => pr.author.login)
   console.log(`PRs found: ${prIDs}`)
 
-  // Get info about the docs-content review board project
-  const projectData: Record<string, any> = await graphql(
+  const projectData = await graphql<ProjectQueryResponse>(
     `
       query ($organization: String!, $projectNumber: Int!) {
         organization(login: $organization) {
@@ -142,18 +171,13 @@ async function run() {
     },
   )
 
-  // Get the project ID
   const projectID = projectData.organization.projectV2.id
 
-  // Get the IDs of the last 100 items on the board.
-  // Until we have a way to check from a PR whether the PR is in a project,
-  // this is how we (roughly) avoid overwriting PRs that are already on the board.
-  // If we are overwriting items, query for more items.
+  // The last 100 board items approximate membership; query more if fields get overwritten.
   const existingItemIDs = projectData.organization.projectV2.items.nodes.map(
-    (node: Record<string, any>) => node.id,
+    (node: { id: string }) => node.id,
   )
 
-  // Get the ID of the fields that we want to populate
   const datePostedID = findFieldID('Date posted', projectData)
   const reviewDueDateID = findFieldID('Review due date', projectData)
   const statusID = findFieldID('Status', projectData)
@@ -162,21 +186,16 @@ async function run() {
   const sizeTypeID = findFieldID('Size', projectData)
   const authorID = findFieldID('Contributor', projectData)
 
-  // Get the ID of the single select values that we want to set
   const readyForReviewID = findSingleSelectID('Ready for review', 'Status', projectData)
   const hubberTypeID = findSingleSelectID('Hubber or partner', 'Contributor type', projectData)
   const docsMemberTypeID = findSingleSelectID('Docs team', 'Contributor type', projectData)
   const sizeMediumID = findSingleSelectID('M', 'Size', projectData)
 
-  // Add the PRs to the project
   const itemIDs = await addItemsToProject(prIDs, projectID)
 
-  // If an item already existed on the project, the existing ID will be returned.
-  // Exclude existing items going forward.
-  // Until we have a way to check from a PR whether the PR is in a project,
-  // this is how we (roughly) avoid overwriting PRs that are already on the board
-  const newItemIDs: any[] = []
-  const newItemAuthors: any[] = []
+  // Existing project items reuse their IDs, so skip them before populating fields.
+  const newItemIDs: string[] = []
+  const newItemAuthors: string[] = []
   for (let index = 0; index < itemIDs.length; index++) {
     const id = itemIDs[index]
     if (!existingItemIDs.includes(id)) {
@@ -190,8 +209,7 @@ async function run() {
     return
   }
 
-  // Populate fields for the new project items
-  // (Using for...of instead of forEach since the function uses await)
+  // Use for...of because the body awaits.
   for (const [index, itemID] of newItemIDs.entries()) {
     const updateProjectV2ItemMutation = generateUpdateProjectV2ItemFieldMutation({
       item: itemID,
@@ -213,7 +231,7 @@ async function run() {
       contributorTypeID,
       contributorType,
       sizeTypeID,
-      sizeType: sizeMediumID, // We need to provide something here, defaulting to 'medium' or 'M'
+      sizeType: sizeMediumID, // The board requires size, so default to M.
       featureID,
       authorID,
       headers: {

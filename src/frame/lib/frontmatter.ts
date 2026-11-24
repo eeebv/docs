@@ -1,6 +1,6 @@
-// when updating to typescript,
-// update links in content/contributing as well
+// Keep TypeScript references in content/contributing in sync with this schema.
 
+import type { SchemaObject } from 'ajv'
 import parse from '@/frame/lib/read-frontmatter'
 import { allVersions } from '@/versions/lib/all-versions'
 import { allTools } from '@/tools/lib/all-tools'
@@ -10,19 +10,25 @@ interface SchemaProperty {
   type?: string | string[]
   translatable?: boolean
   deprecated?: boolean
-  default?: any
+  default?: unknown
   minimum?: number
   maximum?: number
-  enum?: any[]
+  enum?: unknown[]
   errorMessage?: string
-  items?: any
-  properties?: Record<string, any>
+  items?: SchemaProperty | SchemaProperty[]
+  properties?: Record<string, SchemaProperty>
   required?: string[]
   additionalProperties?: boolean
+  patternProperties?: Record<string, SchemaProperty>
   format?: string
   description?: string
   minItems?: number
   maxItems?: number
+}
+
+interface FrontmatterOptions {
+  schema?: SchemaObject
+  filepath?: string | null
 }
 
 interface Schema {
@@ -35,8 +41,6 @@ interface Schema {
 const layoutNames = [
   'default',
   'graphql-explorer',
-  'product-landing',
-  'product-guides',
   'release-notes',
   'inline',
   'category-landing',
@@ -46,22 +50,29 @@ const layoutNames = [
   false,
 ]
 
-// DEPRECATED: Use 'contentType' instead of 'type' for new content.
-// 'type' exists on ~40% of files but is used only for internal analytics.
-// Migration tool: src/content-render/scripts/add-content-type.ts
-const guideTypes = ['overview', 'quick_start', 'tutorial', 'how_to', 'reference', 'rai']
-
-// As of July 2025, use 'contentType' rather than 'type'.
+// Content type values derived from directory structure.
 export const contentTypesEnum = [
   'get-started',
   'concepts',
   'how-tos',
   'reference',
   'tutorials',
-  'homepage', // Only applies to the sole 'content/index.md' file (the homepage).
-  'landing', // Only applies to 'content/<product>/index.md' files (product landings).
-  'rai', // Only applies to files that live in directories with 'responsible-use' in the name.
+  'homepage', // content/index.md only.
+  'landing', // content/<product>/index.md only.
+  'rai', // Files under directories whose names contain responsible-use.
   'other', // Everything else.
+]
+
+// docsTeamMetrics groups related articles by feature or subject across directories.
+export const docsTeamMetricsEnum = [
+  'ado-migration',
+  'ai-governance',
+  'code-quality',
+  'copilot-cli',
+  'copilot-usage-metrics',
+  'enterprise-onboarding',
+  'gitlab-migration',
+  'secret-protection',
 ]
 
 export const schema: Schema = {
@@ -89,11 +100,11 @@ export const schema: Schema = {
       type: 'string',
       translatable: true,
     },
-    // true by default on articles, false on all other content
+    // Articles default to true, and all other content defaults to false.
     showMiniToc: {
       type: 'boolean',
     },
-    // This frontmatter property is deprecated. Despite what `miniTocMaxHeadingLevel` says, the max level of mini TOC is *always* 2. See github/docs-engineering#2701.
+    // miniTocMaxHeadingLevel is deprecated; accessibility limits mini TOCs to h2.
     miniTocMaxHeadingLevel: {
       deprecated: true,
       type: 'number',
@@ -104,16 +115,15 @@ export const schema: Schema = {
     subcategory: {
       type: 'boolean',
     },
-    // allow hidden articles under `early-access`
+    // early-access can hide articles.
     hidden: {
       type: 'boolean',
     },
-    // specify whether an Early Access article should not have a header notice
+    // Early Access articles can opt out of the header notice.
     noEarlyAccessBanner: {
       type: 'boolean',
     },
-    // specify whether an Early Access product should have a table of contents
-    // (EA categories and subcategories have them by default, but products don't)
+    // Early Access products can opt into a TOC; categories and subcategories get one by default.
     earlyAccessToc: {
       type: 'boolean',
     },
@@ -162,32 +172,14 @@ export const schema: Schema = {
           type: 'array',
           items: { type: 'string' },
         },
-        // allows you to use an alternate heading for the popular column
+        // Popular columns can override their heading.
         popularHeading: {
           type: 'string',
           translatable: true,
         },
-        videos: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              title: {
-                type: 'string',
-              },
-              href: {
-                type: 'string',
-              },
-            },
-          },
-        },
-        // allows you to use an alternate heading for the videos column
-        videosHeading: {
-          type: 'string',
-        },
       },
     },
-    // Shown in `product-landing.html` "What's new" section
+    // changelog is deprecated and stays valid because translations still carry it.
     changelog: {
       type: 'object',
       properties: {
@@ -202,28 +194,17 @@ export const schema: Schema = {
         enum: ['builder', 'driver'],
       },
     },
-    // DEPRECATED: Use 'contentType' instead of 'type' for new content.
-    // 'type' exists on ~40% of files but is used only for internal analytics.
-    // Migration tool: src/content-render/scripts/add-content-type.ts
-    type: {
-      type: 'string',
-      enum: guideTypes,
-    },
-    // As of July 2025, use 'contentType' rather than 'type'.
     contentType: {
       type: 'string',
       enum: contentTypesEnum,
     },
-    topics: {
-      type: 'array',
+    // Single-track journey landings can override the articles heading.
+    journeyArticlesHeading: {
+      type: 'string',
+      translatable: true,
+      description: 'Override the default "Articles" heading on single-track journey landing pages',
     },
-    includeGuides: {
-      type: 'array',
-    },
-    learningTracks: {
-      type: 'array',
-    },
-    // Journey tracks for journey landing pages
+    // Journey landing pages can define tracks.
     journeyTracks: {
       type: 'array',
       items: {
@@ -244,10 +225,29 @@ export const schema: Schema = {
             translatable: true,
             description: 'Optional description for the journey track',
           },
+          timeCommitment: {
+            type: 'string',
+            translatable: true,
+            description:
+              'Optional time commitment displayed as metadata for the track (e.g. "2-4 hours")',
+          },
           guides: {
             type: 'array',
             items: {
-              type: 'string',
+              type: 'object',
+              required: ['href'],
+              properties: {
+                href: {
+                  type: 'string',
+                  description: 'Path to the article in the journey track',
+                },
+                alternativeNextStep: {
+                  type: 'string',
+                  description:
+                    'Optional branching text for the article when guiding users through the journey',
+                },
+              },
+              additionalProperties: false,
             },
             description: 'Array of article paths that make up this journey track',
           },
@@ -256,24 +256,37 @@ export const schema: Schema = {
       },
       description: 'Array of journey tracks for journey landing pages',
     },
-    // Used in `product-landing.html`
+    // beta_product is deprecated and stays valid because translations still carry it.
     beta_product: {
       type: 'boolean',
-    },
-    // Show in `product-landing.html`
-    product_video: {
-      type: 'string',
-    },
-    // Show in `product-landing.html`
-    product_video_transcript: {
-      type: 'string',
     },
     // Hero image for landing pages
     heroImage: {
       type: 'string',
     },
+    // Dark-mode hero image for landing pages. Only needed when the art has no
+    // transparent-safe colors, such as a logo whose light version disappears on a dark canvas.
+    heroImageDark: {
+      type: 'string',
+    },
+    // Event-specific hero styling that replaces the hero image on landing pages
+    heroTheme: {
+      type: 'string',
+      enum: ['mos-diner'],
+    },
+    // Pages with no navigable children, such as event landings, can drop the doc-tree rail.
+    hideSidebar: {
+      type: 'boolean',
+    },
     interactive: {
       type: 'boolean',
+    },
+    docsTeamMetrics: {
+      type: 'array',
+      items: {
+        type: 'string',
+        enum: docsTeamMetricsEnum,
+      },
     },
     communityRedirect: {
       type: 'object',
@@ -286,26 +299,26 @@ export const schema: Schema = {
         },
       },
     },
-    // Platform-specific content preference
+    // Platform-specific content defaults to this preference.
     defaultPlatform: {
       type: 'string',
       enum: ['mac', 'windows', 'linux'],
     },
-    // Tool-specific content preference, the list of tools are kept in
-    // make it easier to update in a single place
+    // Tool-specific content defaults to this preference.
+    // allTools keeps the preference list in one place.
     defaultTool: {
       type: 'string',
       enum: Object.keys(allTools),
     },
-    // Child groups specified on top-level TOC
+    // Top-level TOCs can define child groups.
     childGroups: {
       type: 'array',
     },
-    // Child links specified on any TOC page
+    // TOC pages can define child links.
     children: {
       type: 'array',
     },
-    // External products specified on the homepage
+    // The homepage can list external products.
     externalProducts: {
       type: 'object',
       required: ['electron'],
@@ -322,12 +335,11 @@ export const schema: Schema = {
         },
       },
     },
-    // whether or not the page is mirrored by an experimental page
+    // hidden-docs linter permits pages with experimental alternatives to be hidden.
     hasExperimentalAlternative: {
       type: 'boolean',
     },
-    // Translation metadata properties added during the translation process,
-    // we don't use these properties ourselves.
+    // Translation metadata stays valid even though this code does not read it.
     'ms.openlocfilehash': {
       type: 'string',
     },
@@ -348,9 +360,16 @@ export const schema: Schema = {
     },
     autogenerated: {
       type: 'string',
-      enum: ['audit-logs', 'codeql-cli', 'github-apps', 'graphql', 'rest', 'webhooks'],
+      enum: [
+        'audit-logs',
+        'codeql-cli',
+        'github-apps',
+        'graphql',
+        'rest',
+        'secret-scanning',
+        'webhooks',
+      ],
     },
-    // START category-landing tags
     category: {
       type: 'array',
       errorMessage: `must be an array, which is written in frontmatter like:
@@ -360,14 +379,16 @@ category:
     complexity: {
       type: 'array',
     },
+    surface: {
+      type: 'array',
+    },
     industry: {
       type: 'array',
     },
     octicon: {
       type: 'string',
     },
-    // END category landing tags
-    // Custom sidebar link for category pages
+    // Category pages can override their sidebar link.
     sidebarLink: {
       type: 'object',
       required: ['text', 'href'],
@@ -381,7 +402,7 @@ category:
         },
       },
     },
-    // Spotlight configuration for category landing pages
+    // Category landing pages can define spotlight cards.
     spotlight: {
       type: 'array',
       items: {
@@ -401,14 +422,45 @@ category:
       },
       description: 'Array of articles to feature in the spotlight section',
     },
-    // Recommended configuration for category landing pages
-    recommended: {
+    // Cookbook-style category landings can choose visible filters.
+    // Allowed values: 'category' (always shown), 'surface', 'complexity'.
+    filters: {
       type: 'array',
-      minItems: 3,
-      maxItems: 9,
-      description: 'Array of articles to feature in the carousel section',
+      items: {
+        type: 'string',
+        enum: ['category', 'surface', 'complexity'],
+      },
+      description:
+        'Which filter menus to display on the category landing page. The category filter is always shown.',
     },
-    // Included categories for article grid filtering
+    // Category landing pages can define multiple carousels.
+    carousels: {
+      type: 'object',
+      description: 'Multiple named carousels with articles to feature',
+      patternProperties: {
+        '^[a-zA-Z_][a-zA-Z0-9_]*$': {
+          type: 'array',
+          minItems: 3,
+          maxItems: 9,
+          items: {
+            type: 'string',
+          },
+        },
+      },
+    },
+    // Event pages list articles by priority, and later grid pages might not be seen,
+    // so they can opt out of the default alphabetical sort.
+    keepArticleOrder: {
+      type: 'boolean',
+      description: 'Show article grid cards in children order instead of sorting by title',
+    },
+    // Event pages let visitors send the page to themselves from a phone. Opt-in
+    // because most landing pages are reached from docs, where sharing adds noise.
+    showShareButton: {
+      type: 'boolean',
+      description: 'Show a Share button in the landing page hero',
+    },
+    // Article grids can limit their category filter options.
     includedCategories: {
       type: 'array',
       items: {
@@ -419,7 +471,6 @@ category:
   },
 }
 
-// returns a list of deprecated properties
 export const deprecatedProperties = Object.keys(schema.properties).filter((prop: string) => {
   return (schema.properties as Record<string, SchemaProperty>)[prop].deprecated
 })
@@ -439,22 +490,24 @@ const featureVersionsProp = {
 const semverRange = {
   type: 'string',
   format: 'semver',
-  // This is JSON pointer syntax with ajv so we can specify the bad version
-  // in the error message.
+  // AJV JSON pointer syntax injects the bad version into the error message.
   errorMessage: 'Must be a valid SemVer range: ${0}',
 }
 
-;(schema.properties as Record<string, any>).versions = {
-  type: ['object', 'string'], // allow a '*' string to indicate all versions
-  additionalProperties: false, // don't allow any versions in FM that aren't defined in lib/all-versions
-  properties: Object.values(allVersions).reduce((acc: any, versionObj) => {
-    acc[versionObj.plan] = semverRange
-    acc[versionObj.shortName] = semverRange
-    return acc
-  }, featureVersionsProp),
+;(schema.properties as Record<string, SchemaProperty>).versions = {
+  type: ['object', 'string'], // '*' means all versions.
+  additionalProperties: false, // Allow only feature plus each version's plan and short name.
+  properties: Object.values(allVersions).reduce(
+    (acc: Record<string, SchemaProperty>, versionObj) => {
+      acc[versionObj.plan] = semverRange
+      acc[versionObj.shortName] = semverRange
+      return acc
+    },
+    featureVersionsProp,
+  ),
 }
 
-export function frontmatter(markdown: string, opts: any = {}) {
+export function frontmatter(markdown: string, opts: FrontmatterOptions = {}) {
   const defaults = {
     schema,
   }
@@ -462,7 +515,7 @@ export function frontmatter(markdown: string, opts: any = {}) {
   return parse(markdown, Object.assign({}, defaults, opts))
 }
 
-// attach the schema object so it can be `require`d elsewhere.
+// CommonJS callers need the schema on the exported function.
 frontmatter.schema = schema
 
 export default frontmatter

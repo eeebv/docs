@@ -1,5 +1,8 @@
 import { GetServerSideProps } from 'next'
+import type { Response } from 'express'
 import GithubSlugger from 'github-slugger'
+import type { ExtendedRequest } from '@/types'
+import type { ServerResponse } from 'http'
 
 import { MainContextT, MainContext, getMainContext } from '@/frame/components/context/MainContext'
 import { AutomatedPage } from '@/automated-pipelines/components/AutomatedPage'
@@ -40,15 +43,13 @@ export const getServerSideProps: GetServerSideProps<Props> = async (context) => 
   const { getGraphqlBreakingChanges } = await import('@/graphql/lib/index')
   const { getAutomatedPageMiniTocItems } = await import('@/frame/lib/get-mini-toc-items')
 
-  const req = context.req as any
-  const res = context.res as any
+  const req = context.req as unknown as ExtendedRequest
+  const res = context.res as unknown as ServerResponse
   const currentVersion = context.query.versionId as string
   const schema = getGraphqlBreakingChanges(currentVersion)
   if (!schema) throw new Error(`No graphql breaking changes schema found for ${currentVersion}`)
 
-  // Gets the miniTocItems in the article context. At this point it will only
-  // include miniTocItems that exist in Markdown pages in
-  // content/graphql/reference/*
+  // Start from the current page's Markdown headings, then append the generated ones.
   const automatedPageContext = getAutomatedPageContextFromRequest(req)
   const slugger = new GithubSlugger()
   const headings = Object.fromEntries(
@@ -65,13 +66,12 @@ export const getServerSideProps: GetServerSideProps<Props> = async (context) => 
     }),
   )
   const titles = Object.values(headings).map((heading) => heading.title)
-  const changelogMiniTocItems = await getAutomatedPageMiniTocItems(titles, req.context.context, 2)
-  // Update the existing context to include the miniTocItems from GraphQL
+  const changelogMiniTocItems = await getAutomatedPageMiniTocItems(titles, req.context!, 2)
   automatedPageContext.miniTocItems.push(...changelogMiniTocItems)
 
   return {
     props: {
-      mainContext: await getMainContext(req, res),
+      mainContext: await getMainContext(req, res as unknown as Response),
       automatedPageContext,
       schema,
       headings,

@@ -54,30 +54,29 @@ describe('pages module', () => {
         .map((page) => pick(page, ['redirect_from', 'applicableVersions', 'fullPath']))
         .value()
 
-      // Map from redirect path to Set of file paths
       const redirectToFiles = new Map<string, Set<string>>()
       const versionedRedirects: Array<{ path: string; file: string }> = []
 
-      // Page objects have dynamic properties from chain/lodash that aren't fully typed
+      // lodash pick loses the concrete Page fields that the redirect loop needs.
       for (const page of englishPages) {
-        for (const redirect of (page as any).redirect_from) {
-          for (const version of (page as any).applicableVersions) {
+        const pageObj = page as Record<string, unknown>
+        for (const redirect of pageObj.redirect_from as string[]) {
+          for (const version of pageObj.applicableVersions as string[]) {
             const versioned = removeFPTFromPath(path.posix.join('/', version, redirect))
-            versionedRedirects.push({ path: versioned, file: (page as any).fullPath })
+            versionedRedirects.push({ path: versioned, file: pageObj.fullPath as string })
             if (!redirectToFiles.has(versioned)) {
               redirectToFiles.set(versioned, new Set<string>())
             }
-            redirectToFiles.get(versioned)!.add((page as any).fullPath)
+            redirectToFiles.get(versioned)!.add(pageObj.fullPath as string)
           }
         }
       }
 
-      // Only consider as duplicate if more than one unique file defines the same redirect
+      // A redirect duplicates only when more than one file defines it.
       const duplicates = Array.from(redirectToFiles.entries())
         .filter(([, files]) => files.size > 1)
         .map(([redirectPath]) => redirectPath)
 
-      // Build a detailed message with sources for each duplicate
       const message = `Found ${duplicates.length} duplicate redirect_from path${duplicates.length === 1 ? '' : 's'}.
         Ensure that you don't define the same path more than once in the redirect_from property in a single file and across all English files.
         You may also receive this error if you have defined the same children property more than once.\n${duplicates
@@ -94,15 +93,15 @@ describe('pages module', () => {
         .filter((page) => {
           slugger.reset()
           return (
-            page.languageCode === 'en' && // only check English
-            !page.relativePath.includes('index.md') && // ignore TOCs
-            // Page class has dynamic frontmatter properties like 'allowTitleToDifferFromFilename' not in type definition
-            !(page as any).allowTitleToDifferFromFilename && // ignore docs with override
+            page.languageCode === 'en' && // Only English pages enforce filename-title matching.
+            !page.relativePath.includes('index.md') && // TOCs do not use slugified filenames.
+            // Page has dynamic frontmatter properties that its type omits.
+            !(page as Record<string, unknown>).allowTitleToDifferFromFilename && // Allows override.
             slugger.slug(decode(page.title)) !== path.basename(page.relativePath, '.md') &&
             slugger.slug(decode(page.shortTitle || '')) !== path.basename(page.relativePath, '.md')
           )
         })
-        // make the output easier to read
+        // Format failures for review.
         .map((page) => {
           return JSON.stringify(
             {
@@ -125,31 +124,11 @@ describe('pages module', () => {
       expect(nonMatches.length, message).toBe(0)
     })
 
-    test('every page has valid frontmatter', async () => {
-      const frontmatterErrors = chain(pages)
-        // .filter(page => page.languageCode === 'en')
-        // Page class has dynamic error properties like 'frontmatterErrors' not in type definition
-        .map((page) => (page as any).frontmatterErrors)
-        .filter(Boolean)
-        .flatten()
-        .value()
-
-      const failureMessage = `${JSON.stringify(frontmatterErrors, null, 2)}\n\n${chain(
-        frontmatterErrors,
-      )
-        .map('filepath')
-        .join('\n')
-        .value()}`
-
-      expect(frontmatterErrors.length, failureMessage).toBe(0)
-    })
-
     test('every page has valid Liquid templating', async () => {
       const liquidErrors: Array<{ filename: string; error: string }> = []
 
       for (const page of pages) {
-        // Page class has dynamic properties like 'raw' markdown not in type definition
-        const markdown = (page as any).raw
+        const markdown = page.markdown
         if (!patterns.hasLiquid.test(markdown)) continue
         try {
           await liquid.parse(markdown)

@@ -1,4 +1,3 @@
-// Interfaces for content linter rule parameters and callbacks
 export interface MarkdownToken {
   type: string
   tag?: string
@@ -12,11 +11,11 @@ export interface MarkdownToken {
 
 export interface RuleParams {
   name: string // file path
-  lines: string[] // array of lines from the file
-  frontMatterLines: string[] // array of frontmatter lines
-  tokens?: MarkdownToken[] // markdown tokens (when using markdownit parser)
+  lines: string[]
+  frontMatterLines: string[]
+  tokens?: MarkdownToken[] // present only when the rule uses the markdownit parser
   config?: {
-    [key: string]: any // rule-specific configuration
+    [key: string]: unknown // rule-specific configuration
   }
 }
 
@@ -26,7 +25,7 @@ export interface RuleErrorCallback {
     detail?: string,
     context?: string,
     range?: [number, number],
-    fixInfo?: any,
+    fixInfo?: unknown,
   ): void
 }
 
@@ -44,6 +43,8 @@ export type Rule = {
 type RuleDetail = Rule & {
   name: string
   'partial-markdown-files': boolean
+  'yml-files'?: boolean
+  applyToFrontmatter?: boolean
   message: string
   severity: string
   searchPattern: string
@@ -54,6 +55,7 @@ type RuleDetail = Rule & {
 export type Config = {
   severity: string
   'partial-markdown-files': boolean
+  'yml-files'?: boolean
   allowed_languages?: string[]
   style?: string
   rules?: RuleDetail[]

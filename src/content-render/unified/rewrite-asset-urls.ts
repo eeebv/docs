@@ -1,8 +1,13 @@
 import fs from 'fs'
 import type { Element, Node } from 'hast'
 import { visit } from 'unist-util-visit'
+import { createLogger } from '@/observability/logger'
 
-// Matches any <img> tags with an href that starts with `/assets/` or '/public/'
+const logger = createLogger(import.meta.url)
+
+// Process-level cache avoids repeated stat calls; asset files do not change while it runs.
+const statCache = new Map<string, number | null>()
+
 function isAssetOrPublicImg(node: Node): node is Element {
   return (
     node.type === 'element' &&
@@ -15,9 +20,8 @@ function isAssetOrPublicImg(node: Node): node is Element {
   )
 }
 
-// Content authors write images like `![Alt](/assets/images/foo.png`, but
-// for caching purposes we want to rewrite those so they can be cached
-// indefinitely.
+// Cache-busted asset and public image URLs support indefinite caching.
+// /assets/images/help.png becomes /assets/cb-1234/images/help.png.
 export default function rewriteImgSources() {
   return (tree: Node) => {
     visit(tree, 'element', (node: Node) => {
@@ -35,28 +39,27 @@ function getNewSrc(node: Element): string | undefined {
   const src = node.properties?.src as string
   if (!src.startsWith('/')) return
 
+  const filePath = src.slice(1)
+
+  // Reuse stat results to avoid repeated statSync calls for the same image.
+  if (statCache.has(filePath)) {
+    const cachedSize = statCache.get(filePath)
+    if (!cachedSize) return
+    const split = src.split('/')
+    split.splice(2, 0, `cb-${cachedSize}`)
+    return split.join('/')
+  }
+
   try {
-    const filePath = src.slice(1)
     const stats = fs.statSync(filePath)
-    // The size is not perfect but it's good enough. The size is
-    // very fast to pick up without needing to do a deep hashing of the
-    // image's content. It's perfectly possible that someone edits an
-    // image and it's size doesn't change. Although very unlikely.
-    // The slightest change to the image is more likely to either increase
-    // or decrease the image size by at least 1 byte.
-    // Also, because of this limitation, we're not confident to cache the
-    // image more than say 24h. But in the unlikely event that someone does
-    // edit an image and the size doesn't change, there's always the
-    // escape hatch that you can soft-purge all manual CDN surrogate keys.
+    statCache.set(filePath, stats.size || null)
     if (!stats.size) return
     const hash = `${stats.size}`
     const split = src.split('/')
     split.splice(2, 0, `cb-${hash}`)
     return split.join('/')
   } catch {
-    console.warn(
-      `Failed to get a hash for ${src} ` +
-        '(This is mostly harmless and can happen with outdated translations).',
-    )
+    statCache.set(filePath, null)
+    logger.warn('Failed to get a hash for asset URL', { src })
   }
 }

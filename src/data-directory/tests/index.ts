@@ -24,23 +24,21 @@ describe('data-directory', () => {
       return content.replace('markdown', 'MARKDOWN')
     }
     const data = dataDirectory(fixturesDir, { preprocess })
-    expect(data.nested.baz).toBe('I am MARKDOWN!')
+    expect((data.nested as Record<string, unknown>).baz).toBe('I am MARKDOWN!')
   })
 
   test('option: extensions array', async () => {
     const extensions = ['.yml', 'markdown']
     const data = dataDirectory(fixturesDir, { extensions })
     expect('bar' in data).toBe(true)
-    expect('foo' in data).toBe(false) // JSON file should be ignored
+    expect('foo' in data).toBe(false)
   })
 
   test('option: ignorePatterns', async () => {
     const ignorePatterns: RegExp[] = []
 
-    // README is ignored by default
     expect('README' in dataDirectory(fixturesDir)).toBe(false)
 
-    // README can be included by setting empty ignorePatterns array
     expect('README' in dataDirectory(fixturesDir, { ignorePatterns })).toBe(true)
   })
 })

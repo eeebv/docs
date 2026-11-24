@@ -8,9 +8,9 @@ redirect_from:
 versions:
   fpt: '*'
   ghec: '*'
-topics:
-  - 2FA
 shortTitle: Countries supporting SMS
+category:
+  - Learn about authentication
 ---
 If we don't support two-factor authentication via text message for your country of residence, you can set up authentication via a TOTP mobile application. For more information, see [AUTOTITLE](/authentication/securing-your-account-with-two-factor-authentication-2fa/configuring-two-factor-authentication).
 
@@ -36,7 +36,6 @@ If your country or region is not on this list, then we aren't currently able to 
 <li>Brunei</li>
 <li>Bulgaria</li>
 <li>Burundi</li>
-<li>Cambodia</li>
 <li>Canada</li>
 <li>Cape Verde</li>
 <li>Cayman Islands</li>
@@ -57,7 +56,6 @@ If your country or region is not on this list, then we aren't currently able to 
 <li>Gambia</li>
 <li>Georgia</li>
 <li>Germany</li>
-<li>Ghana</li>
 <li>Gibraltar</li>
 <li>Greece</li>
 <li>Guatemala</li>
@@ -80,7 +78,6 @@ If your country or region is not on this list, then we aren't currently able to 
 <li>Luxembourg</li>
 <li>Madagascar</li>
 <li>Malawi</li>
-<li>Malaysia</li>
 <li>Maldives</li>
 <li>Mali</li>
 <li>Malta</li>
@@ -94,7 +91,6 @@ If your country or region is not on this list, then we aren't currently able to 
 <li>Netherlands</li>
 <li>Netherlands Antilles</li>
 <li>New Zealand</li>
-<li>Nigeria</li>
 <li>Norway</li>
 <li>Poland</li>
 <li>Portugal</li>
@@ -110,7 +106,6 @@ If your country or region is not on this list, then we aren't currently able to 
 <li>South Africa</li>
 <li>South Korea</li>
 <li>Spain</li>
-<li>Sri Lanka</li>
 <li>St Lucia</li>
 <li>Sudan</li>
 <li>Sweden</li>

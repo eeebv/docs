@@ -2,53 +2,134 @@ import path from 'path'
 import fs from 'fs'
 
 import { program } from 'commander'
-import chalk from 'chalk'
-import { TokenizationError } from 'liquidjs'
 import walk from 'walk-sync'
 
-import { getLiquidTokens } from '@/content-linter/lib/helpers/liquid-utils'
+import { engine } from '@/content-render/liquid/engine'
+import { allVersions } from '@/versions/lib/all-versions'
+import { getFeaturesByVersion } from '@/versions/middleware/features'
 import languages from '@/languages/lib/languages-server'
 import warmServer from '@/frame/lib/warm-server'
 import type { Site } from '@/types'
 import { correctTranslatedContentStrings } from '@/languages/lib/correct-translation-content'
+import {
+  captureConsole,
+  parseFrontmatterErrors,
+  type FrontmatterError,
+} from '@/languages/lib/frontmatter-error-capture'
 
-program
-  .description('Tally the number of liquid corruptions in a translation')
-  .argument('[language...]', 'language(s) to compare against')
-  .action(main)
-program.parse(process.argv)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  program
+    .description('Tally the number of liquid corruptions in a translation. Outputs JSON to stdout.')
+    .argument('[language...]', 'language(s) to compare against')
+    .option(
+      '-v, --versions <versions>',
+      'comma-separated version(s) to render under (default: all versions)',
+    )
+    .action((languageCodes, options) => main(languageCodes, options))
+  program.parse(process.argv)
+}
 
 type Reusables = Map<string, string>
 
-async function main(languageCodes: string[]) {
-  const langCodes = languageCodes.length
-    ? languageCodes
-    : Object.keys(languages).filter((x) => x !== 'en')
-  const site = await warmServer(languageCodes.length ? ['en', ...langCodes] : [])
+interface CorruptionEntry {
+  file: string
+  location: string
+  error: string
+  illegalTag?: string
+  // The versions this exact corruption (file + location + error) was
+  // observed rendering under. Structural errors surface under every
+  // applicable version; render-time errors may surface under only some.
+  versions: string[]
+}
 
-  // When checking reusables, we only want to check the files that
-  // have an English equivalent.
-  const reusables = getReusables()
+interface LanguageResult {
+  language: string
+  languageName: string
+  total: number
+  corruptions: CorruptionEntry[]
+  byLocation: Record<string, number>
+  topIllegalTags: Array<{ tag: string; count: number }>
+}
 
-  const totalErrors = new Map<string, number>()
+interface CorruptionReport {
+  hasFailures: boolean
+  totalCount: number
+  versions: string[]
+  frontmatterErrors: FrontmatterError[]
+  languages: LanguageResult[]
+}
 
-  for (const languageCode of langCodes) {
-    if (!(languageCode in languages)) {
-      console.error(chalk.red(`Language ${languageCode} not found`))
-      return process.exit(1)
+export function resolveRequestedVersions(optionValue?: string): string[] {
+  const allVersionKeys = Object.keys(allVersions)
+  if (!optionValue) {
+    return allVersionKeys
+  }
+  const versions = Array.from(
+    new Set(
+      optionValue
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean),
+    ),
+  )
+  const invalid = versions.filter((v) => !allVersionKeys.includes(v))
+  if (invalid.length) {
+    throw new Error(
+      `Invalid version(s): ${invalid.join(', ')}. Valid versions: ${allVersionKeys.join(', ')}`,
+    )
+  }
+  return versions
+}
+
+async function main(languageCodes: string[], options: { versions?: string } = {}) {
+  // Validate requested versions before suppressing console output, so errors stay visible.
+  const versions = resolveRequestedVersions(options.versions)
+
+  // Capture warmServer output so YAML frontmatter failures become structured data.
+  const capture = captureConsole()
+
+  let langCodes: string[]
+  let site: Site
+  let reusables: Reusables
+
+  try {
+    langCodes = languageCodes.length
+      ? languageCodes
+      : Object.keys(languages).filter((x) => x !== 'en')
+
+    for (const code of langCodes) {
+      if (!(code in languages)) {
+        throw new Error(`Language ${code} not found`)
+      }
+      if (code === 'en') {
+        throw new Error("Can't test in English ('en')")
+      }
     }
-    if (languageCode === 'en') {
-      console.error(chalk.red("Can't test in English ('en')"))
-      return process.exit(1)
-    }
-    const { errors } = run(languageCode, site, reusables)
-    for (const [error, count] of Array.from(errors.entries())) {
-      totalErrors.set(error, (totalErrors.get(error) || 0) + count)
-    }
+
+    site = await warmServer(languageCodes.length ? ['en', ...langCodes] : [])
+    reusables = getReusables()
+  } finally {
+    capture.restore()
   }
 
-  const sumTotal = Array.from(totalErrors.values()).reduce((acc, count) => acc + count, 0)
-  console.log('\nGRAND TOTAL ERRORS:', sumTotal)
+  const frontmatterErrors = parseFrontmatterErrors(capture.output)
+  const languageResults: LanguageResult[] = []
+
+  for (const languageCode of langCodes) {
+    languageResults.push(await run(languageCode, site, reusables, versions))
+  }
+
+  const totalCount = languageResults.reduce((sum, r) => sum + r.total, 0)
+
+  const report: CorruptionReport = {
+    hasFailures: totalCount > 0 || frontmatterErrors.length > 0,
+    totalCount,
+    versions,
+    frontmatterErrors,
+    languages: languageResults,
+  }
+
+  console.log(JSON.stringify(report, null, 2))
 }
 
 function getReusables(): Reusables {
@@ -65,100 +146,150 @@ function getReusables(): Reusables {
   return reusables
 }
 
-function run(languageCode: string, site: Site, englishReusables: Reusables) {
-  const PADDING = 60
+// Build a minimal Liquid render context for validating translated content.
+// ifversion needs currentVersionObj; data tags call getDataByLanguage internally.
+// Mirror shortVersions and features middleware so bare conditionals such as
+// {% ifversion ghes %} or {% ifversion some-feature %} resolve.
+// Without these flags, Liquid sees an undefined variable and hides real corruptions.
+export function buildRenderContext(languageCode: string, version: string) {
+  const currentVersionObj = allVersions[version]
+  return {
+    ...getFeaturesByVersion(version),
+    currentLanguage: languageCode,
+    currentVersion: version,
+    currentVersionObj,
+    [currentVersionObj.shortName]: true,
+    currentRelease: version.split('@')[1],
+    currentVersionShortName: currentVersionObj.shortName,
+  }
+}
+
+async function run(
+  languageCode: string,
+  site: Site,
+  englishReusables: Reusables,
+  versions: string[],
+): Promise<LanguageResult> {
   const language = languages[languageCode as keyof typeof languages]
 
-  console.log(`--- Tallying liquid corruptions in ${languageCode} (${language.name}) ---`)
-
-  const pageList = site.pageList
-  const errors = new Map<string, number>()
   const wheres = new Map<string, number>()
   const illegalTags = new Map<string, number>()
 
-  function countError(error: TokenizationError, where: string) {
-    const originalError = (error as any).originalError
-    const errorString = originalError ? originalError.message : error.message
-    if (errorString.includes('illegal tag syntax')) {
-      const illegalTag = (error as any).token.content
-      illegalTags.set(illegalTag, (illegalTags.get(illegalTag) || 0) + 1)
+  // Dedupe by file, location, and error, then annotate the entry with every version.
+  const byKey = new Map<string, CorruptionEntry & { versionSet: Set<string> }>()
+
+  // Discard direct console.warn calls during rendering.
+  const originalWarn = console.warn
+  console.warn = () => {}
+
+  function countError(error: Error, where: string, file: string, version: string) {
+    const errorString = error.message
+    const key = `${file}\t${where}\t${errorString}`
+
+    let entry = byKey.get(key)
+    if (!entry) {
+      let illegalTag: string | undefined
+      const errorWithExtras = error as Error & { token?: { content?: string } }
+      if (errorString.includes('illegal tag syntax') && errorWithExtras.token?.content) {
+        illegalTag = errorWithExtras.token.content
+        illegalTags.set(illegalTag, (illegalTags.get(illegalTag) || 0) + 1)
+      }
+
+      entry = {
+        file,
+        location: where,
+        error: errorString,
+        illegalTag,
+        versions: [],
+        versionSet: new Set(),
+      }
+      byKey.set(key, entry)
+      wheres.set(where, (wheres.get(where) || 0) + 1)
     }
-    errors.set(errorString, (errors.get(errorString) || 0) + 1)
-    wheres.set(where, (wheres.get(where) || 0) + 1)
+    entry.versionSet.add(version)
   }
 
-  for (const page of pageList) {
-    if (page.languageCode !== languageCode) continue
+  try {
+    for (const page of site.pageList) {
+      if (page.languageCode !== languageCode) continue
 
-    const strings: string[][] = [
-      ['title', page.title],
-      ['shortTitle', page.shortTitle || ''],
-      ['intro', page.intro || ''],
-      ['markdown', page.markdown],
-    ].filter(([, string]) => Boolean(string))
+      // Render only served versions, because other corruptions cannot break indexing.
+      const pageVersions = versions.filter((v) => page.applicableVersions.includes(v))
+      if (!pageVersions.length) continue
 
-    for (const [where, string] of strings) {
-      try {
-        getLiquidTokens(string)
-      } catch (error) {
-        if (error instanceof TokenizationError) {
-          countError(error, where)
-        } else {
-          throw error
+      const strings: string[][] = [
+        ['title', page.title],
+        ['shortTitle', page.shortTitle || ''],
+        ['intro', page.intro || ''],
+        ['markdown', page.markdown],
+      ].filter(([, string]) => Boolean(string))
+
+      for (const [where, string] of strings) {
+        for (const version of pageVersions) {
+          try {
+            await engine.parseAndRender(string, buildRenderContext(languageCode, version))
+          } catch (error) {
+            if (error instanceof Error) {
+              countError(error, where, page.relativePath, version)
+            } else {
+              throw error
+            }
+          }
         }
       }
     }
-  }
 
-  for (const [relativePath, englishContent] of Array.from(englishReusables.entries())) {
-    try {
-      const filePath = path.join(language.dir, relativePath)
-      const rawContent = fs.readFileSync(filePath, 'utf8')
-      const correctedContent = correctTranslatedContentStrings(rawContent, englishContent, {
-        code: languageCode,
-        relativePath,
-      })
-      getLiquidTokens(correctedContent)
-    } catch (error) {
-      if (error instanceof TokenizationError) {
-        countError(error, 'reusable')
-      } else if (error instanceof Error && error.message.startsWith('ENOENT')) {
-        continue
-      } else {
+    for (const [relativePath, englishContent] of Array.from(englishReusables.entries())) {
+      let correctedContent: string
+      try {
+        const filePath = path.join(language.dir, relativePath)
+        const rawContent = fs.readFileSync(filePath, 'utf8')
+        correctedContent = correctTranslatedContentStrings(rawContent, englishContent, {
+          code: languageCode,
+          relativePath,
+        })
+      } catch (error) {
+        // Missing reusables are untranslated; other read or correction errors are corruptions.
+        if (error instanceof Error) {
+          if (!error.message.startsWith('ENOENT')) {
+            countError(error, 'reusable', relativePath, versions[0])
+          }
+          continue
+        }
         throw error
       }
-    }
-  }
 
-  const flat = Array.from(errors.entries()).sort((a, b) => b[1] - a[1])
-  const sumTotal = flat.reduce((acc, [, count]) => acc + count, 0)
-
-  console.log('\nMost common errors')
-  for (let i = 0; i < flat.length; i++) {
-    const [error, count] = flat[i]
-    console.log(`${i + 1}.`.padEnd(3), error.padEnd(PADDING), count)
-  }
-  console.log(`${'TOTAL:'.padEnd(3 + 1 + PADDING)}`, sumTotal)
-
-  if (sumTotal) {
-    const whereFlat = Array.from(wheres.entries()).sort((a, b) => b[1] - a[1])
-    console.log('\nMost common places')
-    for (let i = 0; i < whereFlat.length; i++) {
-      const [error, count] = whereFlat[i]
-      console.log(`${i + 1}.`.padEnd(3), error.padEnd(PADDING), count)
-    }
-
-    const illegalTagsFlat = Array.from(illegalTags.entries()).sort((a, b) => b[1] - a[1])
-    if (illegalTagsFlat.reduce((acc, [, count]) => acc + count, 0)) {
-      console.log('\nMost common illegal tags', illegalTagsFlat.length > 10 ? ' (Top 10)' : '')
-      const topIllegalTags = illegalTagsFlat.slice(0, 10)
-      for (let i = 0; i < topIllegalTags.length; i++) {
-        const [error, count] = topIllegalTags[i]
-        console.log(`${i + 1}.`.padEnd(3), error.padEnd(PADDING), count)
+      for (const version of versions) {
+        try {
+          await engine.parseAndRender(correctedContent, buildRenderContext(languageCode, version))
+        } catch (error) {
+          if (error instanceof Error) {
+            countError(error, 'reusable', relativePath, version)
+          } else {
+            throw error
+          }
+        }
       }
     }
-  }
-  console.log('\n')
 
-  return { errors }
+    const corruptions: CorruptionEntry[] = Array.from(byKey.values()).map(
+      ({ versionSet, ...entry }) => ({ ...entry, versions: Array.from(versionSet).sort() }),
+    )
+
+    const topIllegalTags = Array.from(illegalTags.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([tag, count]) => ({ tag, count }))
+
+    return {
+      language: languageCode,
+      languageName: language.name,
+      total: corruptions.length,
+      corruptions,
+      byLocation: Object.fromEntries(wheres),
+      topIllegalTags,
+    }
+  } finally {
+    console.warn = originalWarn
+  }
 }

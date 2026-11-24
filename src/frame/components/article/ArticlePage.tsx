@@ -1,12 +1,9 @@
 import { useRouter } from 'next/router'
 import dynamic from 'next/dynamic'
-import cx from 'classnames'
-import { LinkExternalIcon } from '@primer/octicons-react'
 
+import { useArticleContext } from '@/frame/components/context/ArticleContext'
 import { DefaultLayout } from '@/frame/components/DefaultLayout'
 import { ArticleTitle } from '@/frame/components/article/ArticleTitle'
-import { useArticleContext } from '@/frame/components/context/ArticleContext'
-import { LearningTrackNav } from '@/learning-track/components/article/LearningTrackNav'
 import { MarkdownContent } from '@/frame/components/ui/MarkdownContent'
 import { Lead } from '@/frame/components/ui/Lead'
 import { PermissionsStatement } from '@/frame/components/ui/PermissionsStatement'
@@ -14,14 +11,14 @@ import { ArticleGridLayout } from './ArticleGridLayout'
 import { ArticleInlineLayout } from './ArticleInlineLayout'
 import { PlatformPicker } from '@/tools/components/PlatformPicker'
 import { ToolPicker } from '@/tools/components/ToolPicker'
-import { MiniTocs } from '@/frame/components/ui/MiniTocs'
-import { LearningTrackCard } from '@/learning-track/components/article/LearningTrackCard'
+import { MiniTocs, UpNext } from '@/frame/components/ui/MiniTocs'
 import { RestRedirect } from '@/rest/components/RestRedirect'
-import { Breadcrumbs } from '@/frame/components/page-header/Breadcrumbs'
-import { Link } from '@/frame/components/Link'
-import { useTranslation } from '@/languages/components/useTranslation'
 import { LinkPreviewPopover } from '@/links/components/LinkPreviewPopover'
 import { UtmPreserver } from '@/frame/components/UtmPreserver'
+import { JourneyTrackNav } from '@/journeys/components'
+import { CopyMarkdownBelowIntro } from './ViewMarkdownButton'
+import { ExperimentContentSwap } from '@/events/components/experiments/ExperimentContentSwap'
+import { CodeTabsProvider } from '@/frame/components/CodeTabsGroup'
 
 const ClientSideRefresh = dynamic(() => import('@/frame/components/ClientSideRefresh'), {
   ssr: false,
@@ -35,25 +32,24 @@ export const ArticlePage = () => {
     intro,
     effectiveDate,
     renderedPage,
+    renderedPageHast,
     permissions,
     includesPlatformSpecificContent,
     includesToolSpecificContent,
     product,
-    productVideoUrl,
     miniTocItems,
-    currentLearningTrack,
+    currentJourneyTrack,
     supportPortalVaIframeProps,
     currentLayout,
+    currentPath,
   } = useArticleContext()
-  const isLearningPath = !!currentLearningTrack?.trackName
-  const { t } = useTranslation(['pages'])
+  const isJourneyTrack = !!currentJourneyTrack?.trackId
 
   const introProp = (
     <>
       {intro && (
-        // Note the `_page-intro` is used by the popover preview cards
-        // when it needs this text for in-page links.
-        <Lead data-testid="lead" data-search="lead" className="_page-intro">
+        // _page-intro lets popover preview cards reuse this text for in-page links.
+        <Lead variant="hero" data-testid="lead" data-search="lead" className="_page-intro">
           {intro}
         </Lead>
       )}
@@ -69,25 +65,46 @@ export const ArticlePage = () => {
     </>
   )
 
-  const toc = (
+  // Guard the 1400px sidebar because a false-only fragment still paints an empty 326px rail.
+  const hasTocContent = isJourneyTrack || miniTocItems.length > 1
+  const toc = hasTocContent ? (
     <>
-      {isLearningPath && <LearningTrackCard track={currentLearningTrack} />}
       {miniTocItems.length > 1 && <MiniTocs miniTocItems={miniTocItems} />}
+      {isJourneyTrack && currentJourneyTrack && <UpNext journey={currentJourneyTrack} />}
+    </>
+  ) : undefined
+
+  const topper = <ArticleTitle>{title}</ArticleTitle>
+
+  // Keep the copy-markdown control under the lede; layouts only place callouts differently.
+  const introWithCopy = (
+    <>
+      {introProp}
+      <CopyMarkdownBelowIntro currentPath={currentPath} />
+    </>
+  )
+
+  const gridIntro = (
+    <>
+      {introWithCopy}
+      {introCalloutsProp}
     </>
   )
 
   const articleContents = (
-    <div id="article-contents">
-      {productVideoUrl && (
-        <div className="my-2">
-          <Link id="product-video" href={productVideoUrl} target="_blank">
-            <LinkExternalIcon aria-label="(external site)" className="octicon-link mr-2" />
-            {t('video_from_transcript')}
-          </Link>
-        </div>
+    // data-has-upnext extends the section frame 24px to meet journey-track Up next bands.
+    <div
+      id="article-contents"
+      // data-article-body opts articles into section framing; generated references omit it.
+      data-article-body
+      data-has-upnext={isJourneyTrack ? '' : undefined}
+    >
+      {renderedPageHast ? (
+        <MarkdownContent hast={renderedPageHast} />
+      ) : (
+        <MarkdownContent>{renderedPage}</MarkdownContent>
       )}
-
-      <MarkdownContent>{renderedPage}</MarkdownContent>
+      <ExperimentContentSwap containerRef="#article-contents" />
       {effectiveDate && (
         <div className="mt-4" id="effectiveDate">
           Effective as of:{' '}
@@ -100,56 +117,51 @@ export const ArticlePage = () => {
   )
 
   return (
-    <DefaultLayout>
-      <LinkPreviewPopover />
-      <UtmPreserver />
-      {isDev && <ClientSideRefresh />}
-      {router.pathname.includes('/rest/') && <RestRedirect />}
-      {currentLayout === 'inline' ? (
-        <>
-          <ArticleInlineLayout
-            supportPortalVaIframeProps={supportPortalVaIframeProps}
-            topper={<ArticleTitle>{title}</ArticleTitle>}
-            intro={introProp}
-            introCallOuts={introCalloutsProp}
-            toc={toc}
-            breadcrumbs={<Breadcrumbs />}
-          >
-            {articleContents}
-          </ArticleInlineLayout>
-          {isLearningPath ? (
-            <div className="container-lg mt-4 px-3">
-              <LearningTrackNav track={currentLearningTrack} />
+    <DefaultLayout hasDrawer={currentLayout !== 'inline'}>
+      <CodeTabsProvider>
+        <LinkPreviewPopover />
+        <UtmPreserver />
+        {isDev && <ClientSideRefresh />}
+        {router.pathname.includes('/rest/') && <RestRedirect />}
+        {currentLayout === 'inline' ? (
+          <>
+            <ArticleInlineLayout
+              supportPortalVaIframeProps={supportPortalVaIframeProps}
+              topper={topper}
+              intro={introWithCopy}
+              introCallOuts={introCalloutsProp}
+            >
+              {articleContents}
+            </ArticleInlineLayout>
+            {isJourneyTrack ? (
+              <div className="width-full mt-4">
+                <JourneyTrackNav context={currentJourneyTrack} />
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <>
+            {/* Journey pages remove bottom spacing so rails meet the Up next border. */}
+            <div className={`px-3 px-md-6 mt-4 ${isJourneyTrack ? '' : 'mb-4'}`}>
+              <ArticleGridLayout
+                supportPortalVaIframeProps={supportPortalVaIframeProps}
+                topper={topper}
+                tocBreakpoint="xxl"
+                intro={gridIntro}
+                toc={toc}
+              >
+                {articleContents}
+              </ArticleGridLayout>
             </div>
-          ) : null}
-        </>
-      ) : (
-        <div className="container-xl px-3 px-md-6 my-4">
-          <div className={cx('d-none d-xxl-block mt-3 mr-auto width-full')}>
-            <Breadcrumbs />
-          </div>
 
-          <ArticleGridLayout
-            supportPortalVaIframeProps={supportPortalVaIframeProps}
-            topper={<ArticleTitle>{title}</ArticleTitle>}
-            intro={
-              <>
-                {introProp}
-                {introCalloutsProp}
-              </>
-            }
-            toc={toc}
-          >
-            {articleContents}
-          </ArticleGridLayout>
-
-          {isLearningPath ? (
-            <div className="mt-4">
-              <LearningTrackNav track={currentLearningTrack} />
-            </div>
-          ) : null}
-        </div>
-      )}
+            {isJourneyTrack ? (
+              <div className="width-full">
+                <JourneyTrackNav context={currentJourneyTrack} />
+              </div>
+            ) : null}
+          </>
+        )}
+      </CodeTabsProvider>
     </DefaultLayout>
   )
 }

@@ -1,8 +1,6 @@
 name: All documents script
 
-# **What it does**: Verifies that the all-documents script works.
-# **Why we have it**: Code quality and sustainability.
-# **Who does it impact**: docs-engineering
+# Catches all-documents crashes. This workflow has no output assertions.
 
 on:
   pull_request:
@@ -20,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repo
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - uses: ./.github/actions/node-npm-setup
 
@@ -38,5 +36,3 @@ jobs:
           echo ""
           echo "Look at the first 50 lines of the file..."
           cat all-documents.json | jq | head -n 50
-
-          # We're essentially expecting it to not crash and fail.

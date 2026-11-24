@@ -12,7 +12,9 @@ children:
   - /security
   - /metrics
   - /billing-and-usage
+  - /about-actions-policies
 redirect_from:
   - /actions/concepts/use-cases
+contentType: concepts
 ---
 

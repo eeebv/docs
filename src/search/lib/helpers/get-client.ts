@@ -1,12 +1,31 @@
 import { Client } from '@elastic/elasticsearch'
 import { safeUrlDisplay } from '@/search/lib/helpers/strings'
+import { createLogger } from '@/observability/logger'
 
-export function getElasticsearchClient(overrideURL = '', verbose = false): Client {
+const logger = createLogger(import.meta.url)
+
+const DEFAULT_REQUEST_TIMEOUT = 5000
+
+// Each Client owns a keep-alive connection pool, so reuse one per process
+// instead of opening new connections on every search.
+const clients = new Map<string, Client>()
+
+export function getElasticsearchClient(
+  overrideURL = '',
+  verbose = false,
+  options?: { requestTimeout?: number },
+): Client {
   const node = getElasticsearchURL(overrideURL)
   if (verbose) {
-    console.log('Connecting to Elasticsearch URL:', safeUrlDisplay(node))
+    logger.info('Connecting to Elasticsearch URL', { url: safeUrlDisplay(node) })
   }
-  const client = new Client({ node })
+  const requestTimeout = options?.requestTimeout ?? DEFAULT_REQUEST_TIMEOUT
+  const key = `${node}|${requestTimeout}`
+  let client = clients.get(key)
+  if (!client) {
+    client = new Client({ node, requestTimeout })
+    clients.set(key, client)
+  }
   return client
 }
 
@@ -19,7 +38,7 @@ function getElasticsearchURL(overrideURL = ''): string {
   }
   let node = overrideURL || process.env.ELASTICSEARCH_URL || ''
 
-  // Allow the user to lazily set it to `localhost:9200` for example.
+  // Accept localhost:9200 as shorthand for http://localhost:9200.
   if (!node.startsWith('http') && !node.startsWith('://') && node.split(':').length === 2) {
     node = `http://${node}`
   }

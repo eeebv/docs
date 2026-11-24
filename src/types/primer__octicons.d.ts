@@ -6,28 +6,14 @@ declare module '@primer/octicons' {
     'aria-hidden'?: string | boolean
     class?: string
     fill?: string
-    [key: string]: any
+    [key: string]: string | number | boolean | undefined
   }
 
   interface Octicon {
-    /**
-     * The SVG path data for the icon
-     */
     path: string
-
-    /**
-     * The default width of the icon
-     */
     width: number
-
-    /**
-     * The default height of the icon
-     */
     height: number
 
-    /**
-     * Heights-based icon data
-     */
     heights: {
       [size: number]: {
         path: string
@@ -36,16 +22,13 @@ declare module '@primer/octicons' {
       }
     }
 
-    /**
-     * Convert the octicon to an SVG string
-     */
     toSVG(options?: OcticonOptions): string
   }
 
   const octicons: {
     [iconName: string]: Octicon
 
-    // Common icons (non-exhaustive list for better autocomplete)
+    // This non-exhaustive list improves autocomplete for common icons.
     alert: Octicon
     check: Octicon
     'check-circle': Octicon

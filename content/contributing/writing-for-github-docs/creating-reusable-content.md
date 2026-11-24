@@ -6,6 +6,8 @@ versions:
   fpt: '*'
   ghec: '*'
   ghes: '*'
+category:
+  - Write and format content
 ---
 
 ## About reusables
@@ -22,13 +24,13 @@ Reusable files are divided generally into directories by task. For example, if y
 
 ### Applying versioning to reusables
 
-Reusables can include Liquid conditionals to conditionally render content depending on the current version being viewed. <!-- For more information, see [AUTOTITLE](/contributing/syntax-and-versioning-for-github-docs/using-markdown-and-liquid-in-github-docs). -->
+Reusables can include Liquid conditionals to conditionally render content depending on the current version being viewed. <!-- For more information, see [AUTOTITLE](/contributing/writing-for-github-docs/using-markdown-and-liquid-in-github-docs). -->
 
 ## About variables
 
 Variables are short strings of reusable text.
 
-We use YAML files for variables.
+We use YAML files for variables. Define each variable as a string value with a top-level key. You can organize the files in subdirectories.
 
 The path, filename, and keys within each YAML file determine what its path will be in the data object.
 
@@ -36,12 +38,8 @@ For example, this YAML file, `{% raw %}data/variables/foo/bar.yml{% endraw %}`, 
 
 ```yaml
 # the YAML file can contain multiple short strings in one file
-meaning_of_life: 42
-
-# the strings can also be nested if needed
-nested:
-  values:
-    too: Yes!
+meaning_of_life: '42'
+affirmation: 'Yes!'
 ```
 
-The values would be accessible as `{% raw %}{% data foo.bar.meaning_of_life %}{% endraw %}` and `{% raw %}{% data foo.bar.nested.values.too %}{% endraw %}`.
+The values would be accessible as `{% raw %}{% data variables.foo.bar.meaning_of_life %}{% endraw %}` and `{% raw %}{% data variables.foo.bar.affirmation %}{% endraw %}`.

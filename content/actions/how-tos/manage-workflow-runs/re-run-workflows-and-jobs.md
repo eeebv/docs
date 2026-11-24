@@ -1,7 +1,7 @@
 ---
 title: Re-running workflows and jobs
 shortTitle: Re-run workflows and jobs
-intro: 'You can re-run a workflow run, all failed jobs in a workflow run, or specific jobs in a workflow run up to 30 days after its initial run.'
+intro: You can re-run a workflow run, all failed jobs in a workflow run, or specific jobs in a workflow run up to 30 days after its initial run.
 permissions: People with write permissions to a repository can re-run workflows in the repository.
 redirect_from:
   - /actions/managing-workflow-runs/re-running-a-workflow
@@ -12,10 +12,18 @@ versions:
   fpt: '*'
   ghes: '*'
   ghec: '*'
+category:
+  - Manage and monitor workflow runs
+contentType: how-tos
 ---
 
-> [!NOTE]
-> Re-run workflows use the privileges of the actor who initially triggered the workflow, not the privileges of the actor who initiated the re-run. The workflow will also use the same `GITHUB_SHA` (commit SHA) and `GITHUB_REF` (git ref) of the original event that triggered the workflow run.
+Re-runs use the privileges of the actor who initially triggered the workflow, not the privileges of the actor who initiated the re-run. The workflow will also use the same `GITHUB_SHA` (commit SHA) and `GITHUB_REF` (git ref) of the original event that triggered the workflow run.
+
+A workflow run can be re-run a maximum of 50 times. This limit includes both full re-runs and re-runs of a subset of jobs.
+
+When you re-run failed jobs or a specific job, {% data variables.product.github %} also re-runs the jobs that depend on them. Jobs that aren't included keep their outputs from the previous attempt, which the newly run jobs can use.
+
+You can't re-run a workflow run, or any of its jobs, while the workflow is disabled. You need to enable the workflow first. See [AUTOTITLE](/actions/how-tos/manage-workflow-runs/disable-and-enable-workflows).
 
 ## Re-running all the jobs in a workflow
 

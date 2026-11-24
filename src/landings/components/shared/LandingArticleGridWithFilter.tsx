@@ -1,62 +1,45 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
-import { TextInput, ActionMenu, ActionList, Token, Pagination } from '@primer/react'
+import { useRouter } from 'next/router'
+import { ActionMenu, Card, Pagination, TextInput, Token } from '@primer/react-brand'
 import { SearchIcon } from '@primer/octicons-react'
-import cx from 'classnames'
+import { announce } from '@primer/live-region-element'
+import cx from 'clsx'
 
-import { Link } from '@/frame/components/Link'
 import { useTranslation } from '@/languages/components/useTranslation'
-import { ArticleCardItems, ChildTocItem, TocItem } from '@/landings/types'
+import { ChildTocItem, TocItem } from '@/landings/types'
 import { LandingType } from '@/landings/context/LandingContext'
+import type { QueryParams } from '@/search/components/hooks/useMultiQueryParams'
+import { flattenArticles, deriveStopWords, searchArticles } from '@/landings/lib/article-search'
+import { onActionMenuItemKeyDownCapture } from '@/frame/components/lib/action-menu'
 
 import styles from './LandingArticleGridWithFilter.module.scss'
 
 type ArticleGridProps = {
   tocItems: TocItem[]
   includedCategories?: string[]
+  keepArticleOrder?: boolean
   landingType: LandingType
+  params: QueryParams
+  updateParams: (updates: Partial<QueryParams>, shouldPushHistory?: boolean) => void
 }
 
 const ALL_CATEGORIES = 'all_categories'
 
-// Helper function to recursively flatten nested articles
-// Excludes index pages (pages with childTocItems)
-const flattenArticlesRecursive = (articles: (TocItem | ChildTocItem)[]): ArticleCardItems => {
-  const flattened: ArticleCardItems = []
-
-  for (const article of articles) {
-    // If the article has children, recursively process them but don't include the parent (index page)
-    if (article.childTocItems && article.childTocItems.length > 0) {
-      flattened.push(...flattenArticlesRecursive(article.childTocItems))
-    } else {
-      // Only add articles that don't have children (actual article pages, not index pages)
-      flattened.push(article as ChildTocItem)
-    }
-  }
-
-  return flattened
-}
-
-// Wrapper function that flattens and sorts alphabetically by title (only once)
-const flattenArticles = (articles: (TocItem | ChildTocItem)[]): ArticleCardItems => {
-  const flattened = flattenArticlesRecursive(articles)
-  return flattened.sort((a, b) => a.title.localeCompare(b.title))
-}
-
-// Hook to get current articles per page based on screen size
 const useResponsiveArticlesPerPage = () => {
-  const [articlesPerPage, setArticlesPerPage] = useState(9) // Default to desktop
+  // Default to the desktop 3 by 3 grid.
+  const [articlesPerPage, setArticlesPerPage] = useState(9)
 
   useEffect(() => {
     const updateArticlesPerPage = () => {
       const width = window.innerWidth
       if (width < 768) {
-        // Mobile: 1 column, show 8 articles per page
+        // Mobile shows 8 articles in one column.
         setArticlesPerPage(8)
       } else if (width < 1012) {
-        // Tablet: 2 columns, show 8 articles per page (4 rows × 2 columns)
+        // Tablet shows 8 articles as 4 rows by 2 columns.
         setArticlesPerPage(8)
       } else {
-        // Desktop: 3 columns, show 9 articles per page (3 rows × 3 columns)
+        // Desktop shows 9 articles as 3 rows by 3 columns.
         setArticlesPerPage(9)
       }
     }
@@ -69,74 +52,89 @@ const useResponsiveArticlesPerPage = () => {
   return articlesPerPage
 }
 
-export const ArticleGrid = ({ tocItems, includedCategories, landingType }: ArticleGridProps) => {
+// @primer/live-region-element mounts a shadow-DOM live region under document.body, so
+// nearby React updates do not make VoiceOver re-announce the focused input.
+export const ArticleGrid = ({
+  tocItems,
+  includedCategories,
+  keepArticleOrder = false,
+  landingType,
+  params,
+  updateParams,
+}: ArticleGridProps) => {
   const { t } = useTranslation('product_landing')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORIES)
-  const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0)
-  const [currentPage, setCurrentPage] = useState(1)
+  const { locale } = useRouter()
   const articlesPerPage = useResponsiveArticlesPerPage()
 
   const inputRef = useRef<HTMLInputElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Recursively flatten all articles from tocItems, including both direct children and nested articles
-  const allArticles = useMemo(() => flattenArticles(tocItems), [tocItems])
+  const searchQuery = params['articles-filter'] || ''
+  const selectedCategory = params['articles-category'] || ALL_CATEGORIES
+  const currentPage = parseInt(params['articles-page'] || '1', 10)
 
-  // Filter articles based on includedCategories for discovery landing pages
-  // For bespoke landing pages, show all articles regardless of includedCategories
+  const allArticles = useMemo(
+    () => flattenArticles(tocItems, locale, { sortByTitle: !keepArticleOrder }),
+    [tocItems, locale, keepArticleOrder],
+  )
+
+  const stopWords = useMemo(() => deriveStopWords(allArticles), [allArticles])
+
+  // Discovery landings filter to included categories; bespoke landings show every article.
   const filteredArticlesByLandingType = useMemo(() => {
     if (landingType === 'discovery' && includedCategories && includedCategories.length > 0) {
-      // For discovery pages, only include articles that have at least one matching category
+      // Uncategorized discovery articles stay visible because they remain in the content tree.
       return allArticles.filter((article) => {
-        if (!article.category || article.category.length === 0) return false
+        if (!article.category || article.category.length === 0) return true
         return article.category.some((cat) =>
           includedCategories.some((included) => included.toLowerCase() === cat.toLowerCase()),
         )
       })
     }
-    // For bespoke pages or when includedCategories is empty/undefined, return all articles
+    // Empty includedCategories means the landing page has no category filter.
     return allArticles
   }, [allArticles, includedCategories, landingType])
 
-  // Reset to first page when articlesPerPage changes (screen size changes)
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [articlesPerPage])
+  // Dropdown options come from filtered articles so every option has matching results.
+  const categories: string[] = useMemo(
+    () => [
+      ALL_CATEGORIES,
+      ...Array.from(
+        new Set(filteredArticlesByLandingType.flatMap((item) => (item.category || []) as string[])),
+      )
+        .filter((category: string) => {
+          if (!includedCategories || includedCategories.length === 0) return true
+          const lowerCategory = category.toLowerCase()
+          return includedCategories.some((included) => included.toLowerCase() === lowerCategory)
+        })
+        .sort((a, b) => a.localeCompare(b, locale)),
+    ],
+    [filteredArticlesByLandingType, includedCategories, locale],
+  )
 
-  // Extract unique categories for dropdown from filtered articles (so all dropdown options have matching articles)
-  const categories: string[] = [
-    ALL_CATEGORIES,
-    ...Array.from(
-      new Set(filteredArticlesByLandingType.flatMap((item) => (item.category || []) as string[])),
-    )
-      .filter((category: string) => {
-        if (!includedCategories || includedCategories.length === 0) return true
-        // Case-insensitive comparison for dropdown filtering
-        const lowerCategory = category.toLowerCase()
-        return includedCategories.some((included) => included.toLowerCase() === lowerCategory)
-      })
-      .sort((a, b) => a.localeCompare(b)),
-  ]
+  const selectedCategoryIndex = useMemo(() => {
+    const index = categories.indexOf(selectedCategory)
+    return index !== -1 ? index : 0
+  }, [categories, selectedCategory])
+
+  useEffect(() => {
+    if (selectedCategory !== ALL_CATEGORIES && selectedCategoryIndex === 0) {
+      updateParams({ 'articles-category': '' })
+    }
+  }, [selectedCategory, selectedCategoryIndex, updateParams])
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.value = searchQuery
+    }
+  }, [searchQuery])
 
   const applyFilters = () => {
     let results = filteredArticlesByLandingType
 
     if (searchQuery) {
-      results = results.filter((token) => {
-        return Object.values(token).some((value) => {
-          if (typeof value === 'string') {
-            return value.toLowerCase().includes(searchQuery.toLowerCase())
-          } else if (Array.isArray(value)) {
-            return value.some((item) => {
-              if (typeof item === 'string') {
-                return item.toLowerCase().includes(searchQuery.toLowerCase())
-              }
-            })
-          }
-          return false
-        })
-      })
+      results = searchArticles(results, searchQuery, stopWords)
     }
 
     if (selectedCategory !== ALL_CATEGORIES) {
@@ -148,103 +146,205 @@ export const ArticleGrid = ({ tocItems, includedCategories, landingType }: Artic
 
   const filteredResults = applyFilters()
 
-  // Calculate pagination
   const totalPages = Math.ceil(filteredResults.length / articlesPerPage)
-  const startIndex = (currentPage - 1) * articlesPerPage
+  // Page count depends on viewport width and filters, so a URL page can be out of range here.
+  const displayPage = Math.min(
+    Math.max(1, Number.isFinite(currentPage) ? currentPage : 1),
+    Math.max(1, totalPages),
+  )
+  const startIndex = (displayPage - 1) * articlesPerPage
   const paginatedResults = filteredResults.slice(startIndex, startIndex + articlesPerPage)
 
   const handleSearch = (query: string) => {
-    setSearchQuery(query)
-    setCurrentPage(1) // Reset to first page when searching
+    // Search filtering updates the URL without adding browser history entries.
+    updateParams({ 'articles-filter': query || '', 'articles-page': '' }, false)
   }
 
-  const handleFilter = (option: string, index: number) => {
-    setSelectedCategory(option)
-    setSelectedCategoryIndex(index)
-    setCurrentPage(1) // Reset to first page when filtering
+  const handleFilter = (option: string) => {
+    updateParams(
+      {
+        'articles-category': option === ALL_CATEGORIES ? '' : option,
+        'articles-page': '',
+      },
+      true,
+    )
   }
+
+  const prevPageRef = useRef(currentPage)
+  const hasMountedRef = useRef(false)
 
   const handlePageChange = (e: React.MouseEvent, pageNumber: number) => {
     e.preventDefault()
     if (pageNumber >= 1 && pageNumber <= totalPages) {
-      setCurrentPage(pageNumber)
-      if (headingRef.current) {
-        const elementPosition = headingRef.current.getBoundingClientRect().top + window.scrollY
-        const offsetPosition = elementPosition - 140 // 140px offset from top
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: 'smooth',
-        })
-      }
+      updateParams({ 'articles-page': pageNumber === 1 ? '' : String(pageNumber) }, true)
     }
   }
 
-  return (
-    <div data-testid="article-grid-container">
-      {/* Filter and Search Controls */}
-      <div className={styles.filterHeader} data-testid="filter-header">
-        {/* Title and Dropdown Row */}
-        <div className={styles.titleAndDropdownRow}>
-          {/* Title */}
-          <h2 ref={headingRef} className={cx(styles.headerTitle, styles.headerTitleText)}>
-            {t('article_grid.heading')}
-          </h2>
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true
 
-          {/* Category Dropdown */}
+      // Initial loads scroll only for valid article-grid query params.
+      const hasValidCategory = selectedCategory !== ALL_CATEGORIES && selectedCategoryIndex !== 0
+      const hasQueryParams = searchQuery || hasValidCategory || currentPage > 1
+
+      if (hasQueryParams && headingRef.current) {
+        setTimeout(() => {
+          if (headingRef.current) {
+            const elementPosition = headingRef.current.getBoundingClientRect().top + window.scrollY
+            // Keep the heading 140px below the viewport top.
+            const offsetPosition = elementPosition - 140
+            window.scrollTo({
+              top: offsetPosition,
+              behavior: 'smooth',
+            })
+          }
+        }, 100)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const pageChanged = currentPage !== prevPageRef.current
+    const isPaginationClick = pageChanged && prevPageRef.current !== 1
+
+    // Pagination scrolls for page 2 and later, or back to page 1 from a higher page.
+    const shouldScroll = pageChanged && (currentPage > 1 || isPaginationClick)
+
+    if (shouldScroll && headingRef.current) {
+      // Wait for router scroll restoration before moving the article grid.
+      setTimeout(() => {
+        if (headingRef.current) {
+          const elementPosition = headingRef.current.getBoundingClientRect().top + window.scrollY
+          // Keep the heading 140px below the viewport top.
+          const offsetPosition = elementPosition - 140
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth',
+          })
+        }
+      }, 150) // Exceed the router's 100ms debounce plus execution time.
+    }
+
+    prevPageRef.current = currentPage
+  }, [currentPage])
+
+  // Filter query changes debounce one grid scroll so typing does not scroll on every character.
+  const prevFilterRef = useRef({ searchQuery, selectedCategory })
+  const anchorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    const prev = prevFilterRef.current
+    const filtersChanged =
+      prev.searchQuery !== searchQuery || prev.selectedCategory !== selectedCategory
+    prevFilterRef.current = { searchQuery, selectedCategory }
+    if (!filtersChanged) return
+
+    // Keep the timer through unrelated effect cleanup so the scheduled scroll can fire.
+    if (anchorTimeoutRef.current) clearTimeout(anchorTimeoutRef.current)
+    anchorTimeoutRef.current = setTimeout(() => {
+      anchorTimeoutRef.current = null
+      const heading = headingRef.current
+      if (!heading) return
+      const offsetPosition = heading.getBoundingClientRect().top + window.scrollY - 140
+      window.scrollTo({ top: Math.max(0, offsetPosition), behavior: 'smooth' })
+    }, 250) // Run after the router's 100ms debounce and scroll restoration.
+  }, [searchQuery, selectedCategory])
+
+  const noArticlesFoundMessage = t('article_grid.no_articles_found')
+  useEffect(() => {
+    if (statusTimerRef.current) clearTimeout(statusTimerRef.current)
+
+    if (filteredResults.length === 0) {
+      statusTimerRef.current = setTimeout(() => {
+        announce(noArticlesFoundMessage, { politeness: 'assertive' })
+      }, 750)
+    }
+
+    return () => {
+      if (statusTimerRef.current) clearTimeout(statusTimerRef.current)
+    }
+  }, [filteredResults.length, searchQuery, selectedCategory, noArticlesFoundMessage])
+  return (
+    <div className={styles.gridSection} data-testid="article-grid-container">
+      <div className={styles.filterHeader} data-testid="filter-header">
+        <h2 ref={headingRef} className={cx(styles.headerTitle, styles.headerTitleText)}>
+          {t('article_grid.heading')}
+        </h2>
+
+        <div className={styles.controls}>
+          {/* Text-style control matches the Sort by pattern. */}
           <div className={styles.categoryDropdown}>
-            <ActionMenu>
-              <ActionMenu.Button>
-                {categories[selectedCategoryIndex] === ALL_CATEGORIES
-                  ? t('article_grid.all_categories')
-                  : categories[selectedCategoryIndex]}
+            <ActionMenu
+              selectionVariant="single"
+              size="small"
+              menuAlignment="start"
+              onSelect={handleFilter}
+            >
+              <ActionMenu.Button variant="subtle">
+                <span className={styles.categoryButtonLabel}>
+                  <span className={styles.categoryLabel}>
+                    {t('article_grid.filter_by_category')}:
+                  </span>{' '}
+                  <span className={styles.categoryValue}>
+                    {categories[selectedCategoryIndex] === ALL_CATEGORIES
+                      ? t('article_grid.all_categories')
+                      : categories[selectedCategoryIndex]}
+                  </span>
+                </span>
               </ActionMenu.Button>
-              <ActionMenu.Overlay width="auto">
-                <ActionList selectionVariant="single">
-                  {categories.map((category, index) => (
-                    <ActionList.Item
-                      key={index}
-                      selected={index === selectedCategoryIndex}
-                      onSelect={() => handleFilter(category, index)}
-                    >
-                      {category === ALL_CATEGORIES ? t('article_grid.all_categories') : category}
-                    </ActionList.Item>
-                  ))}
-                </ActionList>
+              <ActionMenu.Overlay aria-label={t('article_grid.filter_by_category')}>
+                {categories.map((category, index) => (
+                  <ActionMenu.Item
+                    key={category}
+                    value={category}
+                    selected={index === selectedCategoryIndex}
+                    onKeyDownCapture={onActionMenuItemKeyDownCapture}
+                  >
+                    {category === ALL_CATEGORIES ? t('article_grid.all_categories') : category}
+                  </ActionMenu.Item>
+                ))}
               </ActionMenu.Overlay>
             </ActionMenu>
           </div>
-        </div>
 
-        {/* Search */}
-        <div className={styles.searchContainer}>
-          <form onSubmit={(e) => e.preventDefault()}>
-            <TextInput
-              leadingVisual={SearchIcon}
-              placeholder={t('article_grid.search_articles')}
-              ref={inputRef}
-              autoComplete="false"
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                const query = e.target.value || ''
-                handleSearch(query)
-              }}
-            />
-          </form>
+          <div className={styles.searchContainer}>
+            <form onSubmit={(e) => e.preventDefault()}>
+              <TextInput
+                fullWidth
+                leadingVisual={<SearchIcon />}
+                placeholder={t('article_grid.search_articles')}
+                aria-label={t('article_grid.search_articles')}
+                ref={inputRef}
+                autoComplete="off"
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const query = e.target.value || ''
+                  handleSearch(query)
+                }}
+              />
+            </form>
+          </div>
         </div>
       </div>
 
-      {/* Results Grid */}
       <div className={styles.articleGrid} data-testid="article-grid">
         {paginatedResults.map((article, index) => (
-          <ArticleCard key={startIndex + index} article={article} />
+          <ArticleCard
+            key={startIndex + index}
+            article={article}
+            includedCategories={includedCategories}
+          />
         ))}
         {filteredResults.length === 0 && (
-          <div className={styles.noArticlesContainer} data-testid="no-articles-message">
+          <div
+            className={styles.noArticlesContainer}
+            data-testid="no-articles-message"
+            aria-hidden="true"
+          >
             <p className={styles.noArticlesText}>{t('article_grid.no_articles_found')}</p>
           </div>
         )}
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className={styles.paginationContainer}>
           <div className={styles.showingResults}>
@@ -258,7 +358,7 @@ export const ArticleGrid = ({ tocItems, includedCategories, landingType }: Artic
           </div>
           <Pagination
             pageCount={totalPages}
-            currentPage={currentPage}
+            currentPage={displayPage}
             onPageChange={handlePageChange}
           />
         </div>
@@ -269,31 +369,55 @@ export const ArticleGrid = ({ tocItems, includedCategories, landingType }: Artic
 
 type ArticleCardProps = {
   article: ChildTocItem
+  includedCategories?: string[]
 }
 
-const ArticleCard = ({ article }: ArticleCardProps) => {
+const ArticleCard = ({ article, includedCategories }: ArticleCardProps) => {
+  const router = useRouter()
+
+  // An empty or missing includedCategories means no filtering.
+  const displayCategories =
+    includedCategories && includedCategories.length > 0 && article.category
+      ? article.category.filter((cat) =>
+          includedCategories.some((included) => included.toLowerCase() === cat.toLowerCase()),
+        )
+      : article.category
+
+  const handleClick = async (e: React.MouseEvent<HTMLDivElement>) => {
+    // Intercept Brand Card's anchor only for plain clicks; modified clicks keep browser behavior.
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+    e.preventDefault()
+    try {
+      await router.push(article.fullPath)
+    } catch {
+      // Hard navigation keeps the card usable after suppressing the native anchor click.
+      window.location.href = article.fullPath
+    }
+  }
+
   return (
-    <Link
+    <Card
       href={article.fullPath}
-      className={cx(
-        styles.articleCard,
-        styles.articleCardBox,
-        'border',
-        'border-default',
-        'rounded-2',
-      )}
+      className={styles.card}
+      ctaVariant="none"
+      disableAnimation
+      fullWidth
+      onClick={handleClick}
       data-testid="article-card"
     >
-      <div className={styles.tagsContainer}>
-        {article.category &&
-          article.category.map((cat) => <Token key={cat} text={cat} className="mr-1 mb-2" />)}
-      </div>
+      {displayCategories && displayCategories.length > 0 && (
+        <Card.Tokens>
+          {displayCategories.map((cat) => (
+            <Token key={cat} className={styles.cardToken}>
+              {cat}
+            </Token>
+          ))}
+        </Card.Tokens>
+      )}
 
-      <h3 className={styles.cardTitle}>
-        <span className={styles.cardTitleLink}>{article.title}</span>
-      </h3>
+      <Card.Heading>{article.title}</Card.Heading>
 
-      {article.intro && <div className={styles.cardIntro}>{article.intro}</div>}
-    </Link>
+      {article.intro && <Card.Description>{article.intro}</Card.Description>}
+    </Card>
   )
 }

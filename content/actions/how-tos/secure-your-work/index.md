@@ -1,7 +1,7 @@
 ---
 title: Security for GitHub Actions
 shortTitle: Secure your work
-intro: 'Use security best practices with {% data variables.product.prodname_actions %}, and use {% data variables.product.prodname_actions %} to improve the security of your software supply chain.'
+intro: Use security best practices with {% data variables.product.prodname_actions %}, and use {% data variables.product.prodname_actions %} to improve the security of your software supply chain.
 redirect_from:
   - /actions/security-guides
   - /actions/security-for-github-actions
@@ -13,7 +13,9 @@ versions:
   ghes: '*'
   ghec: '*'
 children:
+  - /lock-workflow-dependencies
   - /use-artifact-attestations
   - /security-harden-deployments
+contentType: how-tos
 ---
 

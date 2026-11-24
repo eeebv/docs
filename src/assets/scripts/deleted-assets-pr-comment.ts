@@ -1,14 +1,14 @@
-import github from '@actions/github'
-import core from '@actions/core'
+import { context as github_context, getOctokit } from '@actions/github'
+import { setOutput } from '@actions/core'
 
 const { GITHUB_TOKEN } = process.env
-const context = github.context
+const context = github_context
 
 if (!GITHUB_TOKEN) {
   throw new Error(`GITHUB_TOKEN environment variable not set`)
 }
 
-// When this file is invoked directly from action as opposed to being imported
+// Direct workflow execution writes the PR comment body to an action output.
 if (import.meta.url.endsWith(process.argv[1])) {
   const owner = context.repo.owner
   const repo = context.payload.repository?.name || ''
@@ -16,7 +16,7 @@ if (import.meta.url.endsWith(process.argv[1])) {
   const headSHA = context.payload.pull_request?.head.sha
 
   const markdown = await main({ owner, repo, baseSHA, headSHA })
-  core.setOutput('markdown', markdown)
+  setOutput('markdown', markdown)
 }
 
 type MainArgs = {
@@ -26,8 +26,7 @@ type MainArgs = {
   headSHA: string
 }
 async function main({ owner, repo, baseSHA, headSHA }: MainArgs) {
-  const octokit = github.getOctokit(GITHUB_TOKEN as string)
-  // get the list of file changes from the PR
+  const octokit = getOctokit(GITHUB_TOKEN as string)
   const response = await octokit.rest.repos.compareCommitsWithBasehead({
     owner,
     repo,
@@ -40,15 +39,17 @@ async function main({ owner, repo, baseSHA, headSHA }: MainArgs) {
     throw new Error('No files found in the PR')
   }
 
+  // Sync pipelines delete and recreate these auto-generated asset directories.
+  const AUTO_GENERATED_ASSET_DIRS = ['assets/images/help/copilot/copilot-sdk/']
+
   const oldFilenames = []
   for (const file of files) {
     const { filename, status } = file
     if (!filename.startsWith('assets')) continue
+    if (AUTO_GENERATED_ASSET_DIRS.some((dir) => filename.startsWith(dir))) continue
     if (status === 'removed') {
-      // Bad
       oldFilenames.push(filename)
     } else if (status === 'renamed') {
-      // Also bad
       const previousFilename = file.previous_filename
       oldFilenames.push(previousFilename)
     }
@@ -58,7 +59,8 @@ async function main({ owner, repo, baseSHA, headSHA }: MainArgs) {
     return ''
   }
 
-  let markdown = '**Please restore deleted assets**\n\n'
+  // dont-delete-assets.yml searches for this marker to update its earlier comment instead of posting a new one.
+  let markdown = '<!-- DELETED_ASSETS -->\n**Please restore deleted assets**\n\n'
   markdown +=
     "Even if you don't reference these assets anymore, as of this branch, please do not delete them.\n"
   markdown += 'They might still be referenced in translated content.\n'

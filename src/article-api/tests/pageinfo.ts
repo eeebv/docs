@@ -1,7 +1,10 @@
 import { beforeAll, describe, expect, test } from 'vitest'
 
 import { get } from '@/tests/helpers/e2etest'
-import { SURROGATE_ENUMS } from '@/frame/middleware/set-fastly-surrogate-key'
+import {
+  makeLanguageSurrogateKey,
+  makePageSurrogateKey,
+} from '@/frame/middleware/set-fastly-surrogate-key'
 import { latest } from '@/versions/lib/enterprise-server-releases'
 
 const makeURL = (pathname: string): string =>
@@ -11,6 +14,8 @@ interface PageMetadata {
   product: string
   title: string
   intro: string
+  documentType: string | null
+  redirectedFrom?: string
 }
 
 interface ErrorResponse {
@@ -19,15 +24,13 @@ interface ErrorResponse {
 
 describe('pageinfo api', () => {
   beforeAll(() => {
-    // If you didn't set the `ROOT` variable, the tests will fail rather
-    // cryptically. So as a warning for engineers running these tests,
-    // alert in case it was accidentally forgotten.
+    // Warn early because missing fixture roots otherwise fail with unclear errors.
     if (!process.env.ROOT) {
       console.warn(
         'WARNING: The pageinfo tests require the ROOT environment variable to be set to the fixture root',
       )
     }
-    // Ditto for fixture-based translations to work
+    // Fixture translations need their own root.
     if (!process.env.TRANSLATIONS_FIXTURE_ROOT) {
       console.warn(
         'WARNING: The pageinfo tests require the TRANSLATIONS_FIXTURE_ROOT environment variable to be set',
@@ -44,13 +47,36 @@ describe('pageinfo api', () => {
     expect(meta.intro).toBe(
       'Get started using HubGit to manage Git repositories and collaborate with others.',
     )
-    // Check that it can be cached at the CDN
+    expect(meta.documentType).toBe('category')
+    expect(meta.redirectedFrom).toBeUndefined()
     expect(res.headers['set-cookie']).toBeUndefined()
     expect(res.headers['cache-control']).toContain('public')
     expect(res.headers['cache-control']).toMatch(/max-age=[1-9]/)
     expect(res.headers['surrogate-control']).toContain('public')
     expect(res.headers['surrogate-control']).toMatch(/max-age=[1-9]/)
-    expect(res.headers['surrogate-key']).toBe(`${SURROGATE_ENUMS.DEFAULT} language:en`)
+    // The page key must match the purge key derived from the source file.
+    expect(res.headers['surrogate-key']).toBe(
+      `${makeLanguageSurrogateKey('en')} ${makePageSurrogateKey('en', 'get-started/start-your-journey/index.md')}`,
+    )
+  })
+
+  // Fullwidth colons make Japanese frontmatter scalar; English fallback prevents empty titles.
+  test('corrupted translation frontmatter falls back to English title', async () => {
+    const res = await get(makeURL('/ja/get-started/foo/broken-frontmatter-translation'))
+    expect(res.statusCode).toBe(200)
+    const meta = JSON.parse(res.body) as PageMetadata
+    expect(meta.title).toBe('Broken frontmatter translation fallback')
+  })
+
+  // Japanese frontmatter has an empty title and a numeric intro, so each key falls back to English.
+  test('mistyped translation frontmatter values fall back to English', async () => {
+    const res = await get(makeURL('/ja/get-started/foo/mistyped-frontmatter-translation'))
+    expect(res.statusCode).toBe(200)
+    const meta = JSON.parse(res.body) as PageMetadata
+    expect(meta.title).toBe('Mistyped frontmatter translation fallback')
+    expect(meta.intro).toBe(
+      'Demonstrates falling back to English when a translated frontmatter value has the wrong type.',
+    )
   })
 
   test('a pathname that does not exist', async () => {
@@ -82,47 +108,62 @@ describe('pageinfo api', () => {
   })
 
   test('redirects correct the URL', async () => {
-    // Regular redirect from `redirect_from`
+    // redirect_from entries set redirectedFrom to the normalized lookup path.
     {
       const res = await get(makeURL('/en/olden-days'))
       expect(res.statusCode).toBe(200)
       const meta = JSON.parse(res.body) as PageMetadata
       expect(meta.title).toBe('HubGit.com Fixture Documentation')
+      expect(meta.redirectedFrom).toBe('/en/olden-days')
     }
-    // Trailing slashes are always removed
+    // Redirect lookups normalize trailing slashes.
     {
       const res = await get(makeURL('/en/olden-days/'))
       expect(res.statusCode).toBe(200)
       const meta = JSON.parse(res.body) as PageMetadata
       expect(meta.title).toBe('HubGit.com Fixture Documentation')
+      expect(meta.redirectedFrom).toBe('/en/olden-days')
     }
-    // Short code for latest version
+    // Short code for the latest version.
     {
       const res = await get(makeURL('/en/enterprise-server@latest/get-started/liquid/ifversion'))
       expect(res.statusCode).toBe(200)
       const meta = JSON.parse(res.body) as PageMetadata
       expect(meta.intro).toMatch(/\(not on fpt\)/)
     }
-    // A URL that doesn't have fpt as an available version
+    // Pages unavailable on FPT redirect to an available product version.
     {
       const res = await get(makeURL('/en/get-started/versioning/only-ghec-and-ghes'))
       expect(res.statusCode).toBe(200)
       const meta = JSON.parse(res.body) as PageMetadata
       expect(meta.title).toBe('Only in Enterprise Cloud and Enterprise Server')
     }
+    // Legacy GraphQL redirect destinations carry a kind and #fragment that pages lack.
+    {
+      const res = await get(makeURL('/en/v4/enum/checkruntype'))
+      expect(res.statusCode).toBe(200)
+      const meta = JSON.parse(res.body) as PageMetadata
+      expect(meta.title).toBe('Checks')
+      expect(meta.redirectedFrom).toBe('/en/v4/enum/checkruntype')
+    }
+    {
+      const res = await get(makeURL('/en/v4/mutation'))
+      expect(res.statusCode).toBe(200)
+      const meta = JSON.parse(res.body) as PageMetadata
+      expect(meta.title).toBe('Reference')
+      expect(meta.redirectedFrom).toBe('/en/v4/mutation')
+    }
   })
 
   test('a page that uses non-trivial Liquid to render', async () => {
-    // This page uses `{% ifversion not fpt %}` in the intro.
+    // The intro uses ifversion logic that changes between FPT and GHES.
 
-    // First on the fpt version
     {
       const res = await get(makeURL('/en/get-started/liquid/ifversion'))
       expect(res.statusCode).toBe(200)
       const meta = JSON.parse(res.body) as PageMetadata
       expect(meta.intro).toMatch(/\(on fpt\)/)
     }
-    // Second on any other version
     {
       const res = await get(makeURL('/en/enterprise-server@latest/get-started/liquid/ifversion'))
       expect(res.statusCode).toBe(200)
@@ -132,19 +173,13 @@ describe('pageinfo api', () => {
   })
 
   test('home pages', async () => {
-    // The home page with language specified
     {
       const res = await get(makeURL('/en'))
       expect(res.statusCode).toBe(200)
       const meta = JSON.parse(res.body) as PageMetadata
       expect(meta.title).toMatch('HubGit.com Fixture Documentation')
     }
-    // enterprise-server with language specified
-    // This is important because it tests that we check for a page
-    // before we bothering to see if it can be a redirect.
-    // That's how our middleware and Next router works. First we look
-    // for a page, if it can't be found, then we check if it's a redirect.
-    // This test proves something that caused a bug in production.
+    // Page lookup must happen before redirect lookup for localized enterprise home pages.
     {
       const res = await get(makeURL(`/en/enterprise-server@${latest}`))
       expect(res.statusCode).toBe(200)
@@ -154,14 +189,12 @@ describe('pageinfo api', () => {
   })
 
   test('home pages (with redirects)', async () => {
-    // The home page for the default language *not* specified
     {
       const res = await get(makeURL('/'))
       expect(res.statusCode).toBe(200)
       const meta = JSON.parse(res.body) as PageMetadata
       expect(meta.title).toMatch('HubGit.com Fixture Documentation')
     }
-    // enterprise-server without language specified
     {
       const res = await get(makeURL('/enterprise-server@latest'))
       expect(res.statusCode).toBe(200)
@@ -170,21 +203,69 @@ describe('pageinfo api', () => {
     }
   })
 
-  test('archived enterprise versions', async () => {
-    // For example /en/enterprise-server@3.8 is a valid Page in the
-    // site tree, but /en/enterprise-server@2.6 is not. Yet we can
-    // 200 OK and serve content for that. This needs to be reflected in
-    // page info too. Even if we have to "fabricate" the title a bit.
+  test('language-less canonical pathnames', async () => {
+    {
+      const res = await get(makeURL('/get-started/start-your-journey/hello-world'))
+      expect(res.statusCode).toBe(200)
+      const meta = JSON.parse(res.body) as PageMetadata
+      expect(meta.title).toBe('Hello World')
+      expect(meta.redirectedFrom).toBe('/get-started/start-your-journey/hello-world')
+    }
+    {
+      const res = await get(
+        makeURL('/enterprise-cloud@latest/get-started/start-your-journey/hello-world'),
+      )
+      expect(res.statusCode).toBe(200)
+      const meta = JSON.parse(res.body) as PageMetadata
+      expect(meta.title).toBe('Hello World')
+    }
+  })
 
-    // At the time of writing, the latest archived version
+  test('documentType for different page types', async () => {
+    {
+      const res = await get(makeURL('/en'))
+      expect(res.statusCode).toBe(200)
+      const meta = JSON.parse(res.body) as PageMetadata
+      expect(meta.documentType).toBe('homepage')
+    }
+    {
+      const res = await get(makeURL('/en/get-started'))
+      expect(res.statusCode).toBe(200)
+      const meta = JSON.parse(res.body) as PageMetadata
+      expect(meta.documentType).toBe('product')
+    }
+    {
+      const res = await get(makeURL('/en/get-started/start-your-journey'))
+      expect(res.statusCode).toBe(200)
+      const meta = JSON.parse(res.body) as PageMetadata
+      expect(meta.documentType).toBe('category')
+    }
+    {
+      const res = await get(makeURL('/en/actions/category/subcategory'))
+      expect(res.statusCode).toBe(200)
+      const meta = JSON.parse(res.body) as PageMetadata
+      expect(meta.documentType).toBe('subcategory')
+    }
+    {
+      const res = await get(makeURL('/en/get-started/start-your-journey/hello-world'))
+      expect(res.statusCode).toBe(200)
+      const meta = JSON.parse(res.body) as PageMetadata
+      expect(meta.documentType).toBe('article')
+    }
+  })
+
+  test('archived enterprise versions', async () => {
+    // Archived versions outside the page tree still get fabricated pageinfo titles.
+
     {
       const res = await get(makeURL('/en/enterprise-server@3.2'))
       expect(res.statusCode).toBe(200)
       const meta = JSON.parse(res.body) as PageMetadata
       expect(meta.title).toMatch('GitHub Enterprise Server 3.2 Help Documentation')
+      expect(meta.documentType).toBeNull()
     }
 
-    // The oldest known archived version that we proxy
+    // Very old enterprise URLs use the legacy /enterprise version path.
     {
       const res = await get(makeURL('/en/enterprise/11.10.340'))
       expect(res.statusCode).toBe(200)
@@ -220,8 +301,7 @@ describe('pageinfo api', () => {
     test('falls back to English if translation is not present', async () => {
       const enRes = await get(makeURL('/en/get-started/start-your-journey'))
       expect(enRes.statusCode).toBe(200)
-      // This page doesn't have a Japanese translation. I.e. it doesn't
-      // even exist on disk. So it'll fall back to English.
+      // Missing translation files fall back to English.
       const translationRes = await get(makeURL('/ja/get-started/start-your-journey'))
       expect(translationRes.statusCode).toBe(200)
       const en = JSON.parse(enRes.body) as PageMetadata

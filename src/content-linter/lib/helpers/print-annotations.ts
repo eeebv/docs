@@ -1,21 +1,26 @@
-/**
- * This function is meant to be used by the code that runs the linter,
- * but only within Actions workflows. That means, if it works, it
- * posts all the annotations as inline comments on the PR.
- *
- */
+// GitHub Actions workflows parse these strings into pull request annotations.
 
+interface LintFlaw {
+  ruleNames: string[]
+  severity: string
+  lineNumber?: number
+  ruleDescription?: string
+  errorDetail?: string
+  context?: string
+  [key: string]: unknown
+}
+
+// Annotations also accept endLine to group one error across consecutive lines:
+// https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-error-message
 export function printAnnotationResults(
-  // Using 'any' type as results structure is dynamic and comes from various linting tools with different formats
-  results: any,
+  results: Record<string, LintFlaw[]>,
   {
     skippableRules = [],
     skippableFlawProperties = [],
   }: { skippableRules?: string[]; skippableFlawProperties?: string[] } = {},
 ) {
   for (const [file, flaws] of Object.entries(results)) {
-    // Using 'any' type for flaws as they have varying structures depending on the linting rule
-    for (const flaw of flaws as any) {
+    for (const flaw of flaws) {
       if (intersection(flaw.ruleNames, skippableRules)) {
         continue
       }
@@ -27,10 +32,6 @@ export function printAnnotationResults(
       const bits = [`file=${file}`]
       if (flaw.lineNumber) {
         bits.push(`line=${flaw.lineNumber}`)
-        // Note: it's possible to use a endLine property
-        // if you can "lump" together the same error description on
-        // consecutive lines.
-        // See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-error-message
       }
 
       if (flaw.ruleDescription) {
@@ -39,25 +40,21 @@ export function printAnnotationResults(
 
       annotation += `${bits.join(',')}`
 
-      if (flaw.errorDetail) {
-        annotation += flaw.errorDetail.endsWith('.')
-          ? `::${flaw.errorDetail}`
-          : `::${flaw.errorDetail}.`
-      }
+      const detail =
+        flaw.errorDetail && !flaw.errorDetail.endsWith('.')
+          ? `${flaw.errorDetail}.`
+          : flaw.errorDetail
+      const message = [detail, flaw.context].filter(Boolean).join(' ') || flaw.ruleDescription || ''
 
-      if (flaw.context) {
-        annotation += ` ${flaw.context}`
-      }
+      // The runner ignores the whole command unless a second '::' precedes the message.
+      annotation += `::${message}`
 
-      // Why console.log and not `core.error()` (from @actions/core)?
-      // Because, this way you can debug this more easily on you own
-      // terminal.
+      // Logging the annotation string keeps local debugging independent of @actions/core.
       console.log(annotation)
     }
   }
 }
 
-// Using 'any' types for generic array intersection utility function
-function intersection(arr1: any[], arr2: any[]) {
-  return arr1.some((item: any) => arr2.includes(item))
+function intersection(arr1: string[], arr2: string[]) {
+  return arr1.some((item) => arr2.includes(item))
 }

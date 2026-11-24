@@ -1,8 +1,8 @@
 ---
 title: Enabling or disabling GitHub Codespaces for your organization
-shortTitle: 'Enable or disable Codespaces'
-intro: 'You can control which users can use {% data variables.product.prodname_github_codespaces %} in your organization''s private {% ifversion ghec %}and internal {% endif %}repositories.'
-permissions: 'Organization owners'
+shortTitle: Enable or disable Codespaces
+intro: You can control which users can use {% data variables.product.prodname_github_codespaces %} in your organization's private {% ifversion ghec %}and internal {% endif %}repositories.
+permissions: Organization owners
 redirect_from:
   - /codespaces/managing-codespaces-for-your-organization/managing-user-permissions-for-your-organization
   - /codespaces/managing-codespaces-for-your-organization/enabling-codespaces-for-your-organization
@@ -10,12 +10,10 @@ redirect_from:
 versions:
   fpt: '*'
   ghec: '*'
-type: how_to
-topics:
-  - Codespaces
-  - Billing
-  - Administrator
 product: '{% data variables.product.prodname_team %} and {% data variables.product.prodname_enterprise %}'
+contentType: how-tos
+category:
+  - Manage codespaces for your organization
 ---
 
 ## About enabling and disabling {% data variables.product.prodname_github_codespaces %}
@@ -47,15 +45,13 @@ To allow a user to create codespaces for a repository owned by your organization
 {% ifversion ghec %}
 
 Additionally, ensure that:
-* Your enterprise does not use OIDC with CAP. For more information, see [AUTOTITLE](/admin/identity-and-access-management/using-enterprise-managed-users-for-iam/about-support-for-your-idps-conditional-access-policy).
-* Your organization does not have an IP address allow list enabled. For more information, see [Managing allowed IP addresses for your organization](/organizations/keeping-your-organization-secure/managing-allowed-ip-addresses-for-your-organization).
+* Your enterprise does not use OIDC with CAP. For more information, see [AUTOTITLE](/admin/managing-iam/configuring-authentication-for-enterprise-managed-users/about-support-for-your-idps-conditional-access-policy).
+* Your organization does not have an IP address allow list enabled. For more information, see [Managing allowed IP addresses for your organization](/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/managing-allowed-ip-addresses-for-your-organization).
 
 {% endif %}
 
 {% ifversion fpt %}
 
-> [!NOTE]
-> If you are a verified educator or a teacher, you must enable {% data variables.product.prodname_github_codespaces %} from a {% data variables.product.prodname_classroom %} to use your {% data variables.product.prodname_codespaces %} Education benefit. For more information, see [AUTOTITLE](/education/manage-coursework-with-github-classroom/integrate-github-classroom-with-an-ide/using-github-codespaces-with-github-classroom#about-the-codespaces-education-benefit-for-verified-teachers).
 
 {% endif %}
 

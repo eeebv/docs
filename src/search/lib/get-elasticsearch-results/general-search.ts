@@ -2,30 +2,23 @@ import { getElasticsearchClient } from '@/search/lib/helpers/get-client'
 import { DEFAULT_HIGHLIGHT_FIELDS } from '@/search/lib/search-request-params/search-params-objects'
 import { getHighlightConfiguration } from '@/search/lib/get-elasticsearch-results/helpers/elasticsearch-highlight-config'
 
-import type {
-  SearchHit as ElasticsearchHit,
-  QueryDslQueryContainer,
-  SearchRequest,
-  SearchTotalHits,
-} from '@elastic/elasticsearch/lib/api/types'
+import type { estypes } from '@elastic/elasticsearch'
 import type {
   AdditionalIncludes,
   ComputedSearchQueryParamsMap,
 } from '@/search/lib/search-request-params/types'
 import type { SearchAggregation, GeneralSearchHit, GeneralSearchResponse } from '@/search/types'
 
-const MAX_AGGREGATE_SIZE = 30
+// Must exceed the number of products in any version, or Elasticsearch drops the smallest buckets
+const MAX_AGGREGATE_SIZE = 100
 
 const isDevMode: boolean = process.env.NODE_ENV !== 'production'
 
 type getGeneralSearchResultsParams = {
   indexName: string
   searchParams: ComputedSearchQueryParamsMap['generalSearch']
-  topics?: string[]
-  includeTopics?: boolean
 }
 
-// Query Elasticsearch for general search results
 export async function getGeneralSearchResults(
   args: getGeneralSearchResultsParams,
 ): Promise<GeneralSearchResponse> {
@@ -43,15 +36,8 @@ export async function getGeneralSearchResults(
       debug,
       sort,
     },
-    topics,
-    includeTopics,
   } = args
 
-  const usePrefixSearch = autocomplete
-
-  if (topics && !Array.isArray(topics)) {
-    throw new Error("'topics' has to be an array")
-  }
   if (include) {
     if (!Array.isArray(include)) {
       throw new Error("'include' has to be an array")
@@ -69,6 +55,7 @@ export async function getGeneralSearchResults(
     }
   }
   const t0 = Date.now()
+  const usePrefixSearch = autocomplete
   const client = getElasticsearchClient()
   const from = size * (page - 1)
 
@@ -80,41 +67,36 @@ export async function getGeneralSearchResults(
     },
   })
 
-  const matchQuery: Record<string, any> = {
-    bool: {
-      should: matchQueries,
-      // This allows filtering by toplevel later.
-      minimum_should_match: 1,
-    },
+  const matchBool: estypes.QueryDslBoolQuery = {
+    should: matchQueries,
+    // Filters make should clauses optional, so require a match before toplevel filters apply.
+    minimum_should_match: 1,
   }
-
-  const topicsArray = Array.isArray(topics) ? topics : topics ? [topics] : []
-  const topicsFilter = topicsArray.map((topic) => {
-    return {
-      term: {
-        // Remember, 'topics' is a keyword field, meaning you need
-        // to filter by "Webhooks", not "webhooks"
-        topics: topic,
-      },
-    }
-  })
-  if (topicsFilter.length) {
-    matchQuery.bool.filter = matchQuery.bool.filter || []
-    matchQuery.bool.filter.push(...topicsFilter)
+  const matchQuery: estypes.QueryDslQueryContainer = {
+    bool: matchBool,
   }
 
   const toplevelArray = toplevel || []
+  // post_filter runs after aggregations, so facet counts stay unfiltered while hits are
+  // filtered. Without aggregations, keep the filter in the query where it can be cached.
+  let postFilter: estypes.QueryDslQueryContainer | undefined
   if (toplevelArray.length) {
-    matchQuery.bool.filter = matchQuery.bool.filter || []
-    matchQuery.bool.filter.push({
+    const toplevelFilter: estypes.QueryDslQueryContainer = {
       terms: {
         toplevel: toplevelArray,
       },
-    })
+    }
+    if (aggregate && aggregate.length) {
+      postFilter = toplevelFilter
+    } else {
+      const filters = Array.isArray(matchBool.filter) ? matchBool.filter : []
+      filters.push(toplevelFilter)
+      matchBool.filter = filters
+    }
   }
 
   const highlightFields = Array.from(highlights || DEFAULT_HIGHLIGHT_FIELDS)
-  // These acts as an alias convenience
+  // content_explicit mirrors content highlight requests.
   if (highlightFields.includes('content')) {
     highlightFields.push('content_explicit')
   }
@@ -122,23 +104,14 @@ export async function getGeneralSearchResults(
 
   const aggs = getAggregations(aggregate)
 
-  const searchQuery: SearchRequest = {
+  const searchQuery: estypes.SearchRequest = {
     index: indexName,
     highlight,
     from,
     size,
     aggs,
-
-    // Since we know exactly which fields from the source we're going
-    // need we can specify that here. It's an inclusion list.
-    // We can save precious network by not having to transmit fields
-    // stored in Elasticsearch to here if it's not going to be needed
-    // anyway.
+    // Only requested source fields cross the network.
     _source_includes: ['title', 'url', 'breadcrumbs', 'popularity', 'toplevel'],
-  }
-
-  if (includeTopics && Array.isArray(searchQuery._source_includes)) {
-    searchQuery._source_includes?.push('topics')
   }
 
   for (const key of ['intro', 'headings'] as const) {
@@ -147,9 +120,12 @@ export async function getGeneralSearchResults(
     }
   }
 
+  if (postFilter) {
+    searchQuery.post_filter = postFilter
+  }
+
   if (sort === 'best') {
-    // To sort by a function score, you need to wrap the primary
-    // match query into a bool operation.
+    // function_score multiplies relevance by popularity for best-first ranking.
     searchQuery.query = {
       bool: {
         must: [
@@ -162,9 +138,7 @@ export async function getGeneralSearchResults(
                 {
                   field_value_factor: {
                     field: 'popularity',
-                    // modifier: 'log1p',
                     factor: 1.0,
-                    // missing: 0.0001,
                     missing: 1.0,
                   },
                 },
@@ -175,22 +149,18 @@ export async function getGeneralSearchResults(
       },
     }
   } else if (sort === 'relevance') {
-    // Do nothing, it's the default.
-    // We could have a secondary sort on the 'popularity' but the
-    // chances of this ever doing anything is very weak because of the
-    // floating point almost always being different.
+    // Relevance sort skips popularity because near-unique scores make it ineffective.
     searchQuery.query = matchQuery
   } else {
     throw new Error(`Unrecognized sort enum '${sort}'`)
   }
 
-  const result = await client.search(searchQuery)
+  const result = await client.search<GeneralSearchSource>(searchQuery)
 
   const hitsAll = result.hits
   const hits = getHits(hitsAll.hits, {
     indexName,
     debug,
-    includeTopics,
     highlightFields,
     include,
   })
@@ -198,7 +168,7 @@ export async function getGeneralSearchResults(
   const t1 = Date.now()
 
   const meta = {
-    found: hitsAll.total as SearchTotalHits,
+    found: hitsAll.total as estypes.SearchTotalHits,
     took: {
       query_msec: result.took,
       total_msec: t1 - t0,
@@ -210,10 +180,12 @@ export async function getGeneralSearchResults(
   return { meta, hits, aggregations: aggregationsResult }
 }
 
-function getAggregations(aggregate?: string[]): Record<string, any> | undefined {
+function getAggregations(
+  aggregate?: string[],
+): Record<string, estypes.AggregationsAggregationContainer> | undefined {
   if (!aggregate || !aggregate.length) return undefined
 
-  const aggs: Record<string, any> = {}
+  const aggs: Record<string, estypes.AggregationsAggregationContainer> = {}
   for (const key of aggregate) {
     aggs[key] = {
       terms: {
@@ -227,18 +199,19 @@ function getAggregations(aggregate?: string[]): Record<string, any> | undefined 
 
 function getAggregationsResult(
   aggregate?: string[],
-  result?: Record<string, any>,
+  result?: Record<string, estypes.AggregationsAggregate>,
 ): Record<string, SearchAggregation[]> | undefined {
   if (!aggregate || !aggregate.length || !result) return undefined
   const aggregations: Record<string, SearchAggregation[]> = {}
   for (const key of aggregate) {
-    if (result[key]?.buckets) {
-      aggregations[key] = result[key].buckets
-        .map((bucket: any) => ({
+    const agg = result[key] as { buckets?: Array<{ key: string; doc_count: number }> } | undefined
+    if (agg?.buckets) {
+      aggregations[key] = agg.buckets
+        .map((bucket) => ({
           key: bucket.key as string,
           count: bucket.doc_count as number,
         }))
-        .sort((a: { key: string }, b: { key: string }) => a.key.localeCompare(b.key))
+        .sort((a, b) => a.key.localeCompare(b.key))
     }
   }
   return aggregations
@@ -252,50 +225,30 @@ interface GetMatchQueriesOptions {
   }
 }
 
+// For autocomplete, getMatchQueries skips match_phrase_prefix on content.
+// match_phrase_prefix matches preceding terms and expands the last word, so
+// short category pages that list titles over-rank:
+// https://www.elastic.co/guide/en/elasticsearch/reference/7.17/query-dsl-match-query-phrase-prefix.html#match-phrase-prefix-query-notes
 function getMatchQueries(
   query: string,
   { usePrefixSearch, fuzzy }: GetMatchQueriesOptions,
-): QueryDslQueryContainer[] {
+): estypes.QueryDslQueryContainer[] {
   const BOOST_PHRASE = 10.0
   const BOOST_TITLE = 4.0
   const BOOST_HEADINGS = 3.0
   const BOOST_CONTENT = 1.0
   const BOOST_AND = 2.5
   const BOOST_EXPLICIT = 6.5
-  // Number doesn't matter so much but just make sure it's
-  // boosted low. Because we only really want this to come into
-  // play if nothing else matches. E.g. a search for `AcIons`
-  // which wouldn't find anything else anyway.
+  // Fuzzy title matches get a low boost so exact and phrase matches dominate ranking.
   const BOOST_FUZZY = 0.1
 
-  const matchQueries: QueryDslQueryContainer[] = []
+  const matchQueries: estypes.QueryDslQueryContainer[] = []
 
-  // If the query input is multiple words, it's good to know because you can
-  // make the query do `match_phrase` and you can make `match` query
-  // with the `AND` operator (`OR` is the default).
+  // Spaces or hyphens enable phrase and AND-operator matching.
   const isMultiWordQuery = query.includes(' ') || query.includes('-')
 
   if (isMultiWordQuery) {
-    // If the query contains spaces, prioritize a "match phrase" query
-    // beyond a regular "match" query.
-    // Basically, that means if you search for 'foo bar' we'd rather
-    // rank:
-    //     "A common term is foo bar which is often used"
-    // above:
-    //     "Some people use foo"
-    //     "Bar is also a common term"
-    //
-    // So that, when all are matched you get this rank:
-    //     1. "A common term is foo bar which is often used"
-    //     2. "Some people use foo"
-    //     3. "Bar is also a common term"
-    //
-    // But note, a "match phrase" isn't the holy panacea of matches.
-    // In particular, just because there exists a document whose *content*
-    // contains the phrase "... foo bar ..." we might still prefer the
-    // matches on title that contains the words *separately*. This
-    // is why a 'match_phrase' on 'content' has a lesser boost
-    // that a 'match' on 'title'.
+    // Ordinary title word matches beat ordinary content phrase matches.
     const matchPhraseStrategy = usePrefixSearch ? 'match_phrase_prefix' : 'match_phrase'
     matchQueries.push(
       ...[
@@ -313,13 +266,6 @@ function getMatchQueries(
         { [matchPhraseStrategy]: { headings: { boost: BOOST_PHRASE * BOOST_HEADINGS, query } } },
       ],
     )
-    // If the content is short, it is given a disproportionate advantage
-    // in search ranking. For example, our category and subcategory pages
-    // often includes a list of other document titles but because it's so
-    // short it thinks that content is really relevant. This only applies
-    // when you use `match_phrase_prefix` which first makes a search
-    // all preceeding terms and then manually appends matches on the last word.
-    // See https://www.elastic.co/guide/en/elasticsearch/reference/7.17/query-dsl-match-query-phrase-prefix.html#match-phrase-prefix-query-notes
     if (!usePrefixSearch) {
       matchQueries.push(
         ...[
@@ -334,7 +280,7 @@ function getMatchQueries(
     }
   }
 
-  // Unless the query was something like `"foo bar"` search on each word
+  // Quoted multi-word queries skip per-word matching so phrase search stays strict.
   if (!(isMultiWordQuery && query.startsWith('"') && query.endsWith('"'))) {
     const matchStrategy = usePrefixSearch ? 'match_bool_prefix' : 'match'
     if (isMultiWordQuery) {
@@ -403,10 +349,7 @@ function getMatchQueries(
     )
   }
 
-  // Add a fuzzy query if it's not too short or too long.
-  // Might consider only enabling this when there's no space in the query
-  // because something like "githob actions" will overwhelmingly
-  // match on the "actions" part with the regular 'match' query.
+  // Fuzzy matching applies only within the configured length bounds.
   if (query.length > fuzzy.minLength && query.length < fuzzy.maxLength) {
     matchQueries.push({
       fuzzy: {
@@ -415,22 +358,20 @@ function getMatchQueries(
     })
   }
 
-  // If the query is just a single no-space word...
+  // Single-token URL searches also match page paths.
   if (query.split(/\s/g).length === 1) {
-    // E.g. someone searched for `/en/site-policy/github-company-policies`
+    // A path query such as /en/site-policy/github-company-policies matches url.
     if (query.startsWith('/')) {
       matchQueries.push({
         match: { url: query.split('?')[0].split('#')[0] },
       })
     } else if (query.startsWith('http')) {
-      // E.g. `https://docs.github.com/en/some/page?foo=bar`
-      // will become a search on `{url: '/en/some/page'}`
+      // Full docs.github.com URLs match their pathname, such as /en/some/page.
       let pathname: string | undefined
       try {
         pathname = new URL(query).pathname
       } catch {
-        // If it failed, it can't be initialized with the `URL` constructor
-        // so we can deem it *not* a valid URL.
+        // Invalid URL strings do not add a url match.
       }
       if (pathname) {
         matchQueries.push({
@@ -446,48 +387,46 @@ function getMatchQueries(
 interface GetHitsOptions {
   indexName: string
   debug?: boolean
-  includeTopics?: boolean
   highlightFields: string[]
   include: AdditionalIncludes[]
 }
 
+interface GeneralSearchSource {
+  url: string
+  title: string
+  breadcrumbs: string
+  popularity?: number
+  [key: string]: unknown
+}
+
 function getHits(
-  hits: ElasticsearchHit<any>[],
-  { indexName, debug = false, includeTopics = false, highlightFields, include }: GetHitsOptions,
+  hits: estypes.SearchHit<GeneralSearchSource>[],
+  { indexName, debug = false, highlightFields, include }: GetHitsOptions,
 ): GeneralSearchHit[] {
   return hits.map((hit) => {
-    // Return `hit.highlights[...]` based on the highlight fields requested.
-    // So if you searched with `&highlights=headings&highlights=content`
-    // this will become:
-    //   {
-    //      content: [...],
-    //      headings: [...]
-    //   }
-    // even if there was a match on 'title'.
+    // Requested highlight fields get keys even when empty, so the response matches the request.
     const hitHighlights: Record<string, string[]> = {}
     for (const key of highlightFields) {
       hitHighlights[key] = (hit.highlight && hit.highlight[key]) || []
     }
 
+    const source = hit._source!
     const result: GeneralSearchHit = {
-      id: hit._id,
-      url: hit._source.url,
-      title: hit._source.title,
-      breadcrumbs: hit._source.breadcrumbs,
+      id: hit._id!,
+      url: source.url,
+      title: source.title,
+      breadcrumbs: source.breadcrumbs,
       highlights: hitHighlights,
-    }
-    if (includeTopics) {
-      result.topics = hit._source.topics || []
     }
     if (debug) {
       result.score = hit._score ?? 0.0
-      result.popularity = hit._source.popularity ?? 0.0
+      result.popularity = source.popularity ?? 0.0
       if (isDevMode) {
-        result.es_url = `http://localhost:9200/${indexName}/_doc/${hit._id}`
+        result.es_url = `http://localhost:9200/${indexName}/_doc/${encodeURIComponent(hit._id!)}`
       }
     }
     for (const field of include) {
-      result[field] = hit._source[field]
+      result[field] = source[field] as string
     }
     return result
   })

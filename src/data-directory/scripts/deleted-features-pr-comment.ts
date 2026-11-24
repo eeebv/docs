@@ -1,15 +1,9 @@
-/**
- * This script is supposed to be used in Actions. When it's run in Actions
- * there will be an env var called GITHUB_REPOSITORY. If it's not there,
- * you can use this script as a CLI tool. For example:
- *
- *  export GITHUB_TOKEN=github_pat_blablabla
- *  npm run deleted-features-pr-comment -- github docs-internal main 2ba53b6a
- *
- */
+// Produces deleted-feature Markdown as an Actions output; without GITHUB_REPOSITORY, prints it.
+// Required: GITHUB_TOKEN.
+// CLI: npm run deleted-features-pr-comment -- github docs-internal main 2ba53b6a
 
-import github from '@actions/github'
-import core from '@actions/core'
+import { context as github_context, getOctokit } from '@actions/github'
+import { setOutput } from '@actions/core'
 import { program } from 'commander'
 
 const { GITHUB_TOKEN, GITHUB_REPOSITORY } = process.env
@@ -19,7 +13,7 @@ if (!GITHUB_TOKEN) {
 }
 
 if (GITHUB_REPOSITORY) {
-  const context = github.context
+  const context = github_context
 
   const owner = context.repo.owner
   const repo = context.payload.repository!.name
@@ -27,7 +21,7 @@ if (GITHUB_REPOSITORY) {
   const headSHA = process.env.HEAD_SHA || context.payload.pull_request!.head.sha
 
   const markdown = await main(owner, repo, baseSHA, headSHA)
-  core.setOutput('markdown', markdown)
+  setOutput('markdown', markdown)
 } else {
   program
     .description('Print a nice Markdown comment if there were features deleted in a PR.')
@@ -43,8 +37,7 @@ async function main(owner: string, repo: string, baseSHA: string, headSHA: strin
   if (!GITHUB_TOKEN) {
     throw new Error(`GITHUB_TOKEN environment variable not set`)
   }
-  const octokit = github.getOctokit(GITHUB_TOKEN)
-  // get the list of file changes from the PR
+  const octokit = getOctokit(GITHUB_TOKEN)
   const response = await octokit.rest.repos.compareCommitsWithBasehead({
     owner,
     repo,
@@ -62,10 +55,10 @@ async function main(owner: string, repo: string, baseSHA: string, headSHA: strin
 
     console.warn(`Feature involved in this PR: ${filename}; Status: ${status}`)
     if (status === 'removed') {
-      // Bad
+      // Deleted feature files can stay referenced in translated content.
       oldFilenames.push(filename)
     } else if (status === 'renamed') {
-      // Also bad
+      // Renamed feature files can stay referenced by the old name in translated content.
       const previousFilename = file.previous_filename
       oldFilenames.push(previousFilename)
     } else {
@@ -78,7 +71,8 @@ async function main(owner: string, repo: string, baseSHA: string, headSHA: strin
     return ''
   }
 
-  let markdown = '**Please restore deleted features**\n\n'
+  // dont-delete-features.yml searches for this marker to update its earlier comment instead of posting a new one.
+  let markdown = '<!-- DELETED_FEATURES -->\n**Please restore deleted features**\n\n'
   markdown +=
     "Even if you don't reference these features anymore, as of this branch, please do not delete them.\n"
   markdown += 'They might still be referenced in translated content.\n'

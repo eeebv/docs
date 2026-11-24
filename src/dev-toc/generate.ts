@@ -1,21 +1,17 @@
-/**
- * @purpose Writer tool
- * @description Generate a local table of contents for the GitHub Docs website
- *
- * This script creates static HTML files for each documentation version, renders page titles
- * using Liquid templating, and opens the generated TOC in your browser for easy navigation
- * during development. Supports command-line options to specify which sections should be
- * open by default.
- *
- * Usage: tsx src/dev-toc/generate.ts [-o product-ids...]
- */
+// @purpose Writer tool
+// @description Generate a local table of contents for the GitHub Docs website
+//
+// Creates static HTML for each documentation version, renders Liquid page titles, and opens the
+// generated table of contents in your browser. Use -o product-ids... to open sections by default.
+//
+// Run with: tsx src/dev-toc/generate.ts [-o product-ids...]
 
 import fs from 'fs'
 import path from 'path'
 import { execSync } from 'child_process'
 import { program } from 'commander'
 import type { NextFunction, Response } from 'express'
-import type { ExtendedRequest } from '@/types'
+import type { ExtendedRequest, Context } from '@/types'
 import fpt from '@/versions/lib/non-enterprise-default-version'
 import { allVersionKeys } from '@/versions/lib/all-versions'
 import { liquid } from '@/content-render/index'
@@ -60,10 +56,16 @@ async function main(): Promise<void> {
     get: () => '',
     header: () => '',
     accepts: () => false,
-    context: {} as any,
+    context: {} as Context,
   } as unknown as ExtendedRequest
 
-  async function recurse(tree: any): Promise<void> {
+  interface PageTreeNode {
+    page: { rawTitle: string }
+    renderedFullTitle?: string
+    childPages?: PageTreeNode[]
+  }
+
+  async function recurse(tree: PageTreeNode): Promise<void> {
     const { page } = tree
     tree.renderedFullTitle = page.rawTitle.includes('{')
       ? await liquid.parseAndRender(page.rawTitle, req.context)
@@ -76,42 +78,40 @@ async function main(): Promise<void> {
   for (const version of allVersionKeys) {
     req.pagePath = version === fpt ? '/' : `/${version}`
 
-    // Create a subdir for the version if one doesn't exist yet.
     const versionStaticDir = path.posix.join(staticDir, version)
     if (!fs.existsSync(versionStaticDir)) fs.mkdirSync(versionStaticDir)
 
-    // Create a versioned filename.
     const filename = path.posix.join(versionStaticDir, 'index.html')
 
-    // Create a minimal context object.
     await contextualize(req, res, next)
 
-    // Add the tree to the req.context.
     if (req.context && req.context.siteTree && req.context.currentVersion) {
       req.context.currentEnglishTree = req.context.siteTree.en[req.context.currentVersion]
     }
 
     if (req.context && req.context.currentEnglishTree) {
-      await recurse(req.context.currentEnglishTree)
+      await recurse(req.context.currentEnglishTree as PageTreeNode)
     }
 
-    // Add any defaultOpenSections to the context.
     if (req.context) {
       req.context.defaultOpenSections = defaultOpenSections
     }
 
-    // Parse the layout in src/dev-toc/layout.html with the context we created above.
     const outputHtml = await liquid.parseAndRender(layout, Object.assign({}, req.context))
 
-    // Write a static file for each version.
     fs.writeFileSync(filename, outputHtml)
   }
 
-  // Default to FPT for the file to open.
   const fptFile = path.posix.join(staticDirName, fpt, 'index.html')
-
-  execSync(`open ${fptFile}`)
 
   console.log(`\nCreated the TOC! If it doesn't open automatically, open the following file in your browser to view it:\n
 ${fptFile}`)
+
+  const opener =
+    process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start ""' : 'xdg-open'
+  try {
+    execSync(`${opener} "${fptFile}"`, { stdio: 'ignore' })
+  } catch {
+    // Containers and headless machines often have no opener, and the path is already printed above.
+  }
 }

@@ -19,11 +19,10 @@ versions:
   fpt: '*'
   ghec: '*'
   ghes: '*'
-topics:
-  - Billing
 children:
   - /upgrade-plan
   - /downgrade-plan
+  - /change-billing-cycle
   - /manage-pending-changes
   - /view-enterprise-usage
   - /manage-user-licenses

@@ -2,16 +2,17 @@
 title: REST API endpoints for the dependency graph
 shortTitle: Dependency graph
 allowTitleToDifferFromFilename: true
-intro: Use the REST API to view dependency changes and their security impact on your repository.
+intro: >-
+  Use the REST API to view dependency changes and their security impact on your
+  repository.
 versions:
   fpt: '*'
   ghes: '*'
   ghec: '*'
-topics:
-  - API
 children:
   - /dependency-review
   - /dependency-submission
+  - /license-compliance
   - /sboms
 redirect_from:
   - /rest/reference/dependency-graph

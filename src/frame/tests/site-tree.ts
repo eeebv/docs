@@ -7,6 +7,7 @@ import { loadSiteTree } from '@/frame/lib/page-data'
 import nonEnterpriseDefaultVersion from '@/versions/lib/non-enterprise-default-version'
 import { formatAjvErrors } from '@/tests/helpers/schemas'
 import type { SiteTree, Tree } from '@/types'
+import findPageInSiteTree from '@/frame/lib/find-page-in-site-tree'
 
 const latestEnterpriseRelease = EnterpriseServerReleases.latest
 
@@ -36,16 +37,13 @@ describe('siteTree', () => {
       const ghesLatest = `enterprise-server@${latestEnterpriseRelease}`
       const ghesSiteTree = siteTree.en[ghesLatest]
 
-      // Find a page in the tree that we know contains Liquid
-      // TODO: use new findPageInSiteTree helper when it's available
-      const pageWithDynamicTitle = ghesSiteTree.childPages
-        .find((child) => child.href === `/en/${ghesLatest}/admin`)
-        ?.childPages.find(
-          (child) => child.href === `/en/${ghesLatest}/admin/installing-your-enterprise-server`,
-        )
+      const pageWithDynamicTitle = findPageInSiteTree(
+        ghesSiteTree,
+        siteTree.en[nonEnterpriseDefaultVersion],
+        `/en/${ghesLatest}/admin/installing-your-enterprise-server`,
+      )
 
-      // Confirm the raw title contains Liquid
-      expect(pageWithDynamicTitle?.page.title).toEqual(
+      expect(pageWithDynamicTitle.page.title).toEqual(
         'Installing {% data variables.product.prodname_enterprise %}',
       )
     })
@@ -62,7 +60,7 @@ describe('siteTree', () => {
 function validate(currentPage: Tree): void {
   const childPages: Tree[] = currentPage.childPages || []
   for (const childPage of childPages) {
-    // Store page reference before validation to avoid type narrowing
+    // Store page reference before validation to avoid type narrowing.
     const pageRef: Tree = childPage
     const isValid = siteTreeValidate(childPage)
     let errors: string | undefined
@@ -74,7 +72,6 @@ function validate(currentPage: Tree): void {
 
     expect(isValid, errors).toBe(true)
 
-    // Run recursively until we run out of child pages
     validate(pageRef)
   }
 }

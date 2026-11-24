@@ -1,7 +1,7 @@
 ---
 title: Enforcing policies for GitHub Actions in your enterprise
-intro: "You can enforce policies to manage how {% data variables.product.prodname_actions %} can be used within your enterprise."
-permissions: "Enterprise owners"
+intro: You can enforce policies to manage how {% data variables.product.prodname_actions %} can be used within your enterprise.
+permissions: Enterprise owners
 redirect_from:
   - /enterprise/admin/github-actions/enforcing-github-actions-policies-for-your-enterprise
   - /admin/github-actions/enforcing-github-actions-policies-for-your-enterprise
@@ -17,12 +17,10 @@ redirect_from:
 versions:
   ghec: '*'
   ghes: '*'
-type: how_to
-topics:
-  - Actions
-  - Enterprise
-  - Policies
 shortTitle: GitHub Actions policies
+contentType: how-tos
+category:
+  - Secure and govern your enterprise
 ---
 
 ## What are policies for {% data variables.product.prodname_actions %}?
@@ -30,6 +28,8 @@ shortTitle: GitHub Actions policies
 Enterprise policies control the options that are available to enterprise members when they use {% data variables.product.prodname_actions %}.
 
 If you don't enforce enterprise policies, organization owners{% ifversion custom-org-roles %} and users with the "Manage organization Actions policies" permission{% endif %} have full control over {% data variables.product.prodname_actions %} for their organizations.
+
+> [!NOTE] {% data variables.product.prodname_actions %} must be enabled for repositories in an organization for the {% data variables.product.prodname_codeql %} {% data variables.product.prodname_code_scanning %} default setup and {% data variables.product.prodname_code_quality %} workflows to run. However, the {% data variables.product.prodname_codeql %} default setup for {% data variables.product.prodname_code_scanning %} is not affected by other {% data variables.product.prodname_actions %} policies (such as restricting access to public actions or reusable workflows).
 
 ## Enforcing policies
 
@@ -48,14 +48,19 @@ In the "Policies" section, you can control which organizations within your enter
 * Enable {% data variables.product.prodname_actions %} for specific organizations
 * Disable {% data variables.product.prodname_actions %} for all organizations
 
-You can also limit the use of public actions {% ifversion actions-workflow-policy %}and reusable workflows{% endif %}, with the following options:
+> [!NOTE]
+> If you disable {% data variables.product.prodname_actions %}, or do not enable the feature for one or more organizations, this blocks affected organizations from using {% data variables.product.prodname_code_scanning %} and {% data variables.product.prodname_code_quality %} analysis.
+
+### Controlling access to public actions{% ifversion actions-workflow-policy %} and reusable workflows{% endif %}
+
+Enterprises often want to limit access to only a well-tested group of public actions {% ifversion actions-workflow-policy %}and reusable workflows{% endif %} as part of their supply chain governance. The policies available in {% data variables.product.github %} allow you to control access without blocking the dynamic workflows used by {% data variables.product.prodname_code_scanning %} and {% data variables.product.prodname_code_quality %}.
+
+You can enforce strict controls without defining exceptions or additional configuration for {% data variables.product.prodname_code_scanning %} and {% data variables.product.prodname_code_quality %}, with the following options:
 
 * **Allow all actions {% ifversion actions-workflow-policy %}and reusable workflows{% endif %}:** Any action {% ifversion actions-workflow-policy %}or reusable workflow{% endif %} can be used, regardless of who authored it or where it is defined.
 * **Allow enterprise actions {% ifversion actions-workflow-policy %}and reusable workflows{% endif %}:** Only actions {% ifversion actions-workflow-policy %}and reusable workflows{% endif %} defined in a repository within the enterprise can be used. {% ifversion ghec %}Blocks all access to actions authored by {% data variables.product.prodname_dotcom %}, such as the [`actions/checkout`](https://github.com/actions/checkout) action.{% endif %}
 * {% data reusables.actions.policy-label-for-select-actions-workflows %}: Any action {% ifversion actions-workflow-policy %}or reusable workflow{% endif %} defined in a repository within the enterprise can be used, plus any action {% ifversion actions-workflow-policy %}or reusable workflow{% endif %} that matches criteria you specify.
-{%- ifversion actions-blocklist-sha-pinning %}
 * **Require actions to be pinned to a full-length commit SHA**: All actions must be pinned to a full-length commit SHA to be used. This includes actions from your enterprise and actions authored by {% data variables.product.github %}. {% ifversion actions-workflow-policy %}Reusable workflows can still be referenced by tag.{% endif %} For more information, see [AUTOTITLE](/actions/reference/security/secure-use#using-third-party-actions).
-{%- endif %}
 
 <span id="allowing-select-actions-and-reusable-workflows-to-run" ></span>
 
@@ -66,8 +71,8 @@ If you choose this option, actions {% ifversion actions-workflow-policy %}and re
 * **Allow actions created by {% data variables.product.prodname_dotcom %}:** Allows all actions created by {% data variables.product.prodname_dotcom %}, located in the [`actions`](https://github.com/actions) and [`github`](https://github.com/github) organizations.
 * **Allow Marketplace actions by verified creators:** Allows all {% data variables.product.prodname_marketplace %} actions created by verified creators, labeled with {% octicon "verified" aria-label="The verified badge" %}.{% ifversion ghes %}
 
-   Only available if you have {% data variables.product.prodname_github_connect %} enabled and configured with {% data variables.product.prodname_actions %}. See [AUTOTITLE](/admin/github-actions/managing-access-to-actions-from-githubcom/enabling-automatic-access-to-githubcom-actions-using-github-connect).{% endif %}
-* **Allow{% ifversion actions-blocklist-sha-pinning %} or block{% endif %} specified actions{% ifversion actions-workflow-policy %} and reusable workflows{% endif %}:** Allows actions{% ifversion actions-workflow-policy %} and reusable workflows{% endif %} that you specify. You can specify individual actions{% ifversion actions-workflow-policy %} and reusable workflows{% endif %} or entire organizations and repositories.
+   Only available if you have {% data variables.product.prodname_github_connect %} enabled and configured with {% data variables.product.prodname_actions %}. See [AUTOTITLE](/admin/managing-github-actions-for-your-enterprise/managing-access-to-actions-from-githubcom/enabling-automatic-access-to-githubcom-actions-using-github-connect).{% endif %}
+* **Allow or block specified actions{% ifversion actions-workflow-policy %} and reusable workflows{% endif %}:** Allows actions{% ifversion actions-workflow-policy %} and reusable workflows{% endif %} that you specify. You can specify individual actions{% ifversion actions-workflow-policy %} and reusable workflows{% endif %} or entire organizations and repositories.
 
 When specifying actions{% ifversion actions-workflow-policy %} and reusable workflows{% endif %}, use the following syntax:
 
@@ -81,11 +86,11 @@ When specifying actions{% ifversion actions-workflow-policy %} and reusable work
    * To allow all actions{% ifversion actions-workflow-policy %} and reusable workflows{% endif %} in repositories that start with octocat, use `*/octocat**@*`.
 * To specify multiple patterns, use `,` to separate patterns.
    * To allow all actions{% ifversion actions-workflow-policy %} and reusable workflows{% endif %} from the `octocat` and `octokit` organizations, use `octocat/*, octokit/*`.
-{%- ifversion actions-blocklist-sha-pinning %}
 * To block specific patterns, use the `!` prefix.
    * To allow all actions{% ifversion actions-workflow-policy %} and reusable workflows{% endif %} from the `space-org` organization, but block a specific action like `space-org/action`, use `space-org/*, !space-org/action@*`.
    * By default, only actions{% ifversion actions-workflow-policy %} and reusable workflows{% endif %} specified in the list will be allowed. To allow all actions{% ifversion actions-workflow-policy %} and reusable workflows{% endif %} while also blocking specific actions, use `*, !space-org/action@*`.
-{%- endif %}
+
+{% data reusables.actions.lockfile-allowed-actions-sha %}
 
 Policies never restrict access to local actions on the runner filesystem (where the `uses:` path start with `./`).
 
@@ -104,6 +109,37 @@ In the "Runners" section, you can mediate these risks by disabling the use of re
 {% endif %}
 
 {% data reusables.actions.disable-selfhosted-runners-note %}
+
+## Disabling standard hosted runners
+
+You can disable standard {% data variables.product.github %}-hosted runners at the enterprise level. This setting requires workflows to target runners through runner groups and helps enforce consistent access controls and governance.
+
+For information about job concurrency limits for {% data variables.product.github %}-hosted runners, see [AUTOTITLE](/actions/reference/limits#job-concurrency-limits-for-github-hosted-runners).
+
+{% data reusables.enterprise-accounts.access-enterprise %}
+{% data reusables.enterprise-accounts.policies-tab %}
+{% data reusables.enterprise-accounts.actions-tab %}
+1. Scroll to the "Standard hosted runners" section and click **Disable for all organizations**.
+1. Click **Save**.
+
+{% ifversion ghec %}
+
+## Enabling multi-cloud compute
+
+You can opt in to multi-cloud compute to help improve runner availability for eligible Linux jobs in your enterprise. Existing runner labels and workflow syntax remain unchanged. For eligible runner configurations, see [Cloud hosts used by {% data variables.product.prodname_dotcom %}-hosted runners](/actions/concepts/runners/github-hosted-runners#cloud-hosts-used-by-github-hosted-runners).
+
+Before enabling multi-cloud compute, update any IP allowlists or network-based access policies your workflows rely on to include all published runner IP ranges. See [IP addresses](/actions/reference/runners/github-hosted-runners#ip-addresses). If your applications use Azure SDK credentials, also review [Azure SDK authentication troubleshooting](/actions/how-tos/troubleshoot-workflows#azure-sdk-authentication-failures).
+
+To opt in to multi-cloud compute:
+
+{% data reusables.enterprise-accounts.access-enterprise %}
+{% data reusables.enterprise-accounts.policies-tab %}
+{% data reusables.enterprise-accounts.actions-tab %}
+1. Click **General**.
+1. Click the **Policies** tab.
+1. Under "Hosted compute cloud providers", select the dropdown menu, then click **Multi-cloud**.
+
+{% endif %}
 
 ## Custom images
 
@@ -127,23 +163,56 @@ You can define how long custom image versions are retained and when they become 
   * **Default**: 60 days
   * **Configurable range**: 7–90 days
 
-## {% ifversion ghes %}Artifact, log, and cache settings{% else %}Artifact and log retention{% endif %}
+<!-- Anchor to maintain the existing "#artifact-and-log-retention" link from other articles. -->
+<a name="artifact-and-log-retention"></a>
+## {% ifversion ghes %}Check, workflow run, status, artifact, log, and cache settings{% else %}Check, workflow run, status, artifact and log retention{% endif %}
 
 {% ifversion ghes %}
 
-These policies control storage of artifacts, logs, and caches.
+These policies control storage of checks, workflow runs, commit statuses, artifacts, logs, and caches.
 
-### Artifact and log retention
+### Check, workflow run, status, artifact and log retention
 
 {% endif %}
 
-By default, artifacts and log files generated by workflows are retained for 90 days. {% ifversion ghes %}You can change this retention period to anywhere between 1 and 400 days.{% else %}You can change the retention period.
+By default, checks, workflow runs, commit statuses, and the artifacts and log files generated by workflows are retained for 90 days. {% ifversion ghes %}You can change this retention period to anywhere between 1 and 400 days.{% else %}You can change the retention period.
 
 * For public repositories, you can configure a period between 1 and 90 days.
 * For private and internal repositories, you can configure a period between 1 and 400 days.
 {% endif %}
 
-Changes only apply to new artifacts and log files.
+{% ifversion ghec %}
+
+> [!IMPORTANT]
+> Starting October 1, 2026, these policies will apply to checks, workflow runs, and commit statuses in addition to artifacts and logs. Until then, checks, workflow runs, and commit statuses are retained for 400+ days regardless of your configured retention period. Make sure to review your retention setting and make any adjustments before October 1. For more information, see [the {% data variables.product.company_short %} changelog](https://github.blog/changelog/2026-07-17-actions-retention-will-cover-checks-workflow-runs-and-statuses/).
+
+{% endif %}
+
+{% data reusables.actions.checks-and-statuses-retention-scope %}
+
+Changes only apply to new checks, workflow runs, commit statuses, artifacts, and log files.
+
+{% ifversion ghec %}
+
+### Cache settings
+
+You can configure maximum cache retention and size limits that will apply across your entire enterprise. If you increase the "Cache size eviction limit" beyond the 10 GB included in your plan, you will be charged for any additional storage of cached entries.
+
+By default:
+
+* Caches are retained for 7 days before automatic deletion.
+* The total cache storage limit is 10 GB per repository.
+
+You can customize these settings to set maximum limits for cache retention and cache storage size across your enterprise:
+
+* **Cache retention**: Configure up to 90 days for public repositories or 365 days for private and internal repositories.
+* **Cache size eviction limit**: Configure up to 10,000 GB per repository.
+
+The settings you configure at the enterprise level act as maximum limits. Organization owners can opt in to configure limits for their organization, but cannot exceed the limits set at the enterprise level. Repository administrators can opt in to configure limits for their repositories, but cannot exceed the limits set at the organization level.
+
+For more information about cache eviction, see [AUTOTITLE](/actions/reference/workflows-and-actions/dependency-caching#usage-limits-and-eviction-policy).
+
+{% endif %}
 
 {% ifversion ghes %}
 

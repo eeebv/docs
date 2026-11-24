@@ -1,21 +1,15 @@
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
-
 type Dates = {
   [key: string]: {
-    releaseDate: string // For backward compatibility - will be RC date initially, then GA date once available
+    // Templates read releaseDate as the display date: RC date until the GA date exists.
+    releaseDate: string
     deprecationDate: string
-    releaseCandidateDate?: string // Release Candidate date
-    generalAvailabilityDate?: string // General Availability date
-    displayCandidateDate?: string | null // Computed: RC date if in past, null if future
-    displayReleaseDate?: string | null // Computed: GA date if in past, null if future
+    releaseCandidateDate?: string
+    generalAvailabilityDate?: string
+    // Templates hide release dates until each date has passed.
+    displayCandidateDate?: string | null
+    displayReleaseDate?: string | null
   }
 }
-
-// ============================================================================
-// STATICALLY DEFINED VALUES
-// ============================================================================
 
 export const next: string
 export const nextNext: string
@@ -31,10 +25,6 @@ export const lastReleaseWithLegacyFormat: string
 export const firstReleaseNote: string
 export const firstRestoredAdminGuides: string
 
-// ============================================================================
-// COMPUTED VALUES
-// ============================================================================
-
 export const all: string[]
 export const latest: string
 export const latestStable: string
@@ -42,22 +32,15 @@ export const oldestSupported: string
 export const dates: Dates
 export const nextDeprecationDate: string
 export const isOldestReleaseDeprecated: boolean
+export const releasesWithOldestDeprecationDate: string[]
 export const deprecatedOnNewSite: string[]
 export const deprecatedReleasesWithLegacyFormat: string[]
 export const deprecatedReleasesWithNewFormat: string[]
 export const deprecatedReleasesOnDeveloperSite: string[]
 
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
 export declare function findReleaseNumberIndex(releaseNum: string): number
 export declare function getNextReleaseNumber(releaseNum: string): string
 export declare function getPreviousReleaseNumber(releaseNum: string): string
-
-// ============================================================================
-// DEFAULT EXPORT
-// ============================================================================
 
 const allExports = {
   next,
@@ -80,6 +63,7 @@ const allExports = {
   dates,
   nextDeprecationDate,
   isOldestReleaseDeprecated,
+  releasesWithOldestDeprecationDate,
   deprecatedOnNewSite,
   deprecatedReleasesWithLegacyFormat,
   deprecatedReleasesWithNewFormat,

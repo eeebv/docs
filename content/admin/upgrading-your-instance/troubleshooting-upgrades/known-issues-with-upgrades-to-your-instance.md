@@ -1,25 +1,46 @@
 ---
 title: Known issues with upgrades to your instance
-intro: 'See an overview of workarounds for issues that impact the upgrade process for {% data variables.product.prodname_ghe_server %}, or impact your instance after you complete an upgrade.'
+intro: See an overview of workarounds for issues that impact the upgrade process for {% data variables.product.prodname_ghe_server %}, or impact your instance after you complete an upgrade.
 versions:
   ghes: '*'
-type: overview
-topics:
-  - Enterprise
-  - Troubleshooting
-  - Upgrades
 shortTitle: Known issues with upgrades
 redirect_from:
   - /admin/enterprise-management/updating-the-virtual-machine-and-physical-resources/known-issues-with-upgrades-to-your-instance
   - /admin/monitoring-managing-and-updating-your-instance/updating-the-virtual-machine-and-physical-resources/known-issues-with-upgrades-to-your-instance
   - /admin/monitoring-and-managing-your-instance/updating-the-virtual-machine-and-physical-resources/known-issues-with-upgrades-to-your-instance
+contentType: concepts
+category:
+  - Back up and upgrade your instance
 ---
 
 ## About known issues with {% data variables.product.prodname_ghe_server %} upgrades
 
 {% data variables.product.company_short %} is aware of the following issues that could impact upgrades to new releases of {% data variables.product.prodname_ghe_server %}. For more information, see "Known issues" in the [{% data variables.product.prodname_ghe_server %} release notes](/admin/release-notes).
 
-{% data variables.product.company_short %} strongly recommends regular backups of your instance's configuration and data. Before you proceed with any upgrade, back up your instance, then validate the backup in a staging environment. For more information, see [AUTOTITLE](/admin/configuration/configuring-your-enterprise/configuring-backups-on-your-appliance) and [AUTOTITLE](/admin/installation/setting-up-a-github-enterprise-server-instance/setting-up-a-staging-instance).
+If you see the error `The file provided is not a valid GitHub Enterprise Server package` when attempting an upgrade, you may need to rotate the GPG signing key on your instance. For more information, see [AUTOTITLE](/admin/upgrading-your-instance/troubleshooting-upgrades/rotating-the-signing-key-for-upgrade-packages).
+
+{% data variables.product.company_short %} strongly recommends regular backups of your instance's configuration and data. Before you proceed with any upgrade, back up your instance, then validate the backup in a staging environment. For more information, see [AUTOTITLE](/admin/backing-up-and-restoring-your-instance/configuring-backups-on-your-instance) and [AUTOTITLE](/admin/installing-your-enterprise-server/setting-up-a-github-enterprise-server-instance/setting-up-a-staging-instance).
+
+{% ifversion saml-nameid-case-sensitive-upgrade %}
+
+## SAML NameID matching is case-sensitive
+
+This change applies to {% data variables.product.prodname_ghe_server %} **3.19.16, 3.20.12, 3.21.10, and 3.22.5**, released on November 17, 2026. It does not apply to {% data variables.product.prodname_ghe_cloud %} or to {% data variables.product.prodname_ghe_server %} instances with SCIM provisioning enabled.
+
+A security fix changes how SAML `NameID` values are matched to existing accounts. Differences in capitalization, accents, or trailing spaces are rejected rather than ignored. This helps prevent a SAML sign-in from selecting the wrong {% data variables.product.github %} account.
+
+If the `NameID` sent by your identity provider (IdP) during SAML authentication does not exactly match the user's stored SAML mapping on {% data variables.product.prodname_ghe_server %}, authentication fails. For example, an incoming `NameID` of `Mona` no longer matches a stored `NameID` of `mona`. The user sees the error `Another user already owns the account. Please have your administrator check the authentication log.`
+
+Before upgrading, verify that the SAML `NameID` values sent by your IdP match the stored SAML mapping `NameID` values exactly, including the same uppercase and lowercase letters.
+
+1. Check the user's stored SAML `NameID` on the **Security** tab in the site admin dashboard. For more information, see [AUTOTITLE](/admin/managing-iam/using-saml-for-enterprise-iam/updating-a-users-saml-nameid). You can also export mappings using `ghe-saml-mapping-csv --dump`. This utility does not support instances using SCIM provisioning.
+1. Check the incoming SAML `NameID` for the user. Temporarily enable SAML debugging, reproduce the user's SAML sign-in attempt, and inspect the SAML response's `NameID` in the `systemd` journal logs for `github-unicorn`. Disable debugging immediately afterward to avoid excessive logging and potential performance impact. For more information, see [AUTOTITLE](/admin/managing-iam/using-saml-for-enterprise-iam/troubleshooting-saml-authentication#configuring-saml-debugging).
+
+If the values differ, update the user's stored SAML `NameID` mapping to match the value sent by your IdP.
+
+We are working to restore the previous case-insensitive SAML `NameID` matching behavior. The release notes will announce when this update is available.
+
+{% endif %}
 
 ## Lifting the pause on upgrades to version 3.15 and above
 
@@ -28,15 +49,6 @@ We have lifted the pause on upgrades to versions 3.15, 3.16, and 3.17. You can n
 We have extended the support window for versions 3.14, 3.15, 3.16, and 3.17. The support window for 3.13 remains unchanged. The closing down date for each of 3.14, 3.15, 3.16, and 3.17 has been updated. For more information, see [AUTOTITLE](/admin/all-releases#releases-of-github-enterprise-server).
 
 We will continue to release patches for 3.14, 3.15, 3.16, and 3.17 throughout this extended support window.
-
-{% ifversion ghes < 3.15 %}
-
-## Elasticsearch Upgrade
-
-As part of upgrading GitHub Enterprise Server to version 3.13 or later, the Elasticsearch service will be upgraded. {% data variables.product.company_short %} strongly recommends following the guidance in [AUTOTITLE](/admin/upgrading-your-instance/performing-an-upgrade/preparing-for-the-elasticsearch-upgrade).
-{% endif %}
-
-{% ifversion ghes > 3.14 %}
 
 ## Required root disk size increased to 400GB
 
@@ -70,25 +82,3 @@ In case you did not have the opportunity to run the encryption diagnostics scrip
 If undecryptable records are detected, you will be prompted whether you want to proceed with the upgrade or not. If you proceed, the upgrade process deletes the undecryptable records. Otherwise, the upgrade process will exit.
 
 If you have any questions during the upgrade, you can reach out to {% data variables.contact.github_support %}. Once you have had the time and opportunity to understand the impact, you can retrigger the upgrade.
-{% endif %}
-
-{% ifversion ghes < 3.17 %}
-
-## Upgrading from 3.14 to 3.16.0
-
-If you are using {% data variables.product.prodname_ghe_server %} 3.14, and you have enabled security products by default at the organization level, you cannot upgrade directly from 3.14 to 3.16.0. To determine your upgrade eligibility, run the following command:
-
-```shell
-ghe-console -y
-Organization.any? { |o| [o.vulnerability_updates_enabled_for_new_repos?, o.security_alerts_enabled_for_new_repos?, o.dependency_graph_enabled_for_new_repos?, o.advanced_security_enabled_on_new_repos?, SecretScanning::Features::Org::TokenScanning.new(o).secret_scanning_enabled_for_new_repos?, SecretScanning::Features::Org::PushProtection.new(o).enabled_for_new_repos?].any? }
-```
-
-If the command returns `true`, a direct upgrade from 3.14 to 3.16.0 will fail, and we recommend you wait for the next 3.16 patch to upgrade.
-
-Alternatively, you can move to 3.16.0 now by first upgrading from 3.14 to 3.15, then from 3.15 to 3.16.0.
-
-## Upgrading to 3.16.0 and 3.17.0 includes a slow data migration for code scanning
-
-Customers who have code scanning enabled may experience slower transitions when upgrading to version 3.16.0, due to changes in the data model that require data migration. We recommend testing this upgrade in a non-production environment first, as it could result in longer downtime than expected. [Updated: 2025-06-12]
-
-{% endif %}

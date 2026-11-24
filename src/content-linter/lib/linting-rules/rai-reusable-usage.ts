@@ -1,5 +1,6 @@
 import { addError } from 'markdownlint-rule-helpers'
 import { TokenKind } from 'liquidjs'
+import type { TopLevelToken } from 'liquidjs'
 import path from 'path'
 
 import { getFrontmatter } from '../helpers/utils'
@@ -7,9 +8,8 @@ import { getLiquidTokens, getPositionData } from '../helpers/liquid-utils'
 import type { RuleParams, RuleErrorCallback, Rule } from '../../types'
 
 interface Frontmatter {
-  type?: string
-  // Allow any additional frontmatter properties since we only care about 'type'
-  [key: string]: any
+  contentType?: string
+  [key: string]: unknown
 }
 
 interface LiquidToken {
@@ -35,17 +35,19 @@ export const raiReusableUsage: Rule = {
       .filter(
         (token: LiquidToken) => token.name === 'data' || token.name === 'indented_data_reference',
       )
-      // It's ok to reference variables from rai content
+      // Allow RAI content to reference variables.
       .filter((token: LiquidToken) => !token.args.startsWith('variables'))
 
     for (const token of tokens) {
-      // if token is 'data  foo.bar` or `indented_data_reference foo.bar  depth=3`
-      // we only want the `foo.bar` part.
+      // data and indented_data_reference tokens put the reusable path first.
       const dataDirectoryReference = token.args.split(/\s+/)[0]
       if (dataDirectoryReference.startsWith('reusables.rai')) continue
 
       const lines = params.lines
-      const { lineNumber, column, length } = getPositionData(token, lines)
+      const { lineNumber, column, length } = getPositionData(
+        token as unknown as TopLevelToken,
+        lines,
+      )
       addError(
         onError,
         lineNumber,
@@ -58,11 +60,9 @@ export const raiReusableUsage: Rule = {
   },
 }
 
-// Rai file content can be in either the data/reusables/rai directory
-// or anywhere in the content directory
+// RAI content can live in data/reusables/rai or anywhere under content.
 function isFileRai(params: RuleParams): boolean {
-  // ROOT is set in the test environment to src/fixtures/fixtures otherwise
-  // it is set to the root of the project.
+  // Tests set ROOT to src/fixtures/fixtures; production uses the repository root.
   const ROOT = process.env.ROOT || '.'
   const dataPath = path.join(ROOT, 'data/reusables')
   const dataRai = path.join(dataPath, 'rai')
@@ -72,5 +72,5 @@ function isFileRai(params: RuleParams): boolean {
   }
 
   const fm: Frontmatter = (getFrontmatter(params.frontMatterLines) as Frontmatter) || {}
-  return fm.type === 'rai'
+  return fm.contentType === 'rai'
 }

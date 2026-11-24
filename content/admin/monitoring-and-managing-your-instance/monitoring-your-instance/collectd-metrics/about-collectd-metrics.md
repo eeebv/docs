@@ -1,16 +1,12 @@
 ---
 title: About Collectd metrics
-intro: '{% ifversion ghes-opentelemetry %}Collectd metrics provide a legacy monitoring solution for {% data variables.product.prodname_ghe_server %} instances that is supported alongside a {% data variables.release-phases.public_preview %} of OpenTelemetry metrics.{% else %}Collectd metrics provide a monitoring solution for {% data variables.product.prodname_ghe_server %} instances.{% endif %}'
+intro: 'Collectd metrics provide a legacy monitoring solution for {% data variables.product.prodname_ghe_server %} instances that is supported alongside a {% data variables.release-phases.public_preview %} of OpenTelemetry metrics.'
 versions:
-  ghes: '*'
-topics:
-  - Enterprise
-  - Fundamentals
-  - Infrastructure
-  - Monitoring
-  - Performance
-type: overview
+  feature: ghes-collectd-available
 shortTitle: About Collectd metrics
+contentType: concepts
+category:
+  - Monitor and audit your enterprise
 ---
 
 {% data reusables.enterprise.collectd-metrics-future %}
@@ -64,8 +60,6 @@ For more information about setting up external monitoring, see [AUTOTITLE](/admi
 
 For a comprehensive list of available metrics, see [AUTOTITLE](/admin/monitoring-and-managing-your-instance/monitoring-your-instance/collectd-metrics/collectd-metrics-for-github-enterprise-server).
 
-{% ifversion ghes-opentelemetry %}
-
 ## Migration considerations
 
 As {% data variables.product.prodname_ghe_server %} transitions to OpenTelemetry metrics, consider the following:
@@ -74,8 +68,6 @@ As {% data variables.product.prodname_ghe_server %} transitions to OpenTelemetry
 * **Feature parity**: OpenTelemetry metrics provide equivalent and enhanced monitoring capabilities
 * **Planning**: Begin evaluating OpenTelemetry metrics for your monitoring workflows
 * **Timeline**: Plan for the eventual {% data variables.release-phases.closing_down %} and then {% data variables.release-phases.retired %} of collectd metrics in future releases
-
-{% endif %}
 
 ## Next steps
 

@@ -6,8 +6,8 @@ versions:
   fpt: '*'
   ghes: '*'
   ghec: '*'
-topics:
-  - GitHub Apps
+category:
+  - Authenticate with a GitHub App
 ---
 
 ## About JSON Web Tokens (JWTs)
@@ -63,10 +63,8 @@ payload = {
   iat: Time.now.to_i - 60,
   # JWT expiration time (10 minute maximum)
   exp: Time.now.to_i + (10 * 60),
-  
 # {% data variables.product.prodname_github_app %}'s client ID
   iss: "YOUR_CLIENT_ID"
-
 }
 
 jwt = JWT.encode(payload, private_key, "RS256")
@@ -98,7 +96,6 @@ if len(sys.argv) > 2:
 else:
     client_id = input("Enter your Client ID: ")
 
-
 # Open PEM
 with open(pem, 'rb') as pem_file:
     signing_key = pem_file.read()
@@ -108,7 +105,6 @@ payload = {
     'iat': int(time.time()),
     # JWT expiration time (10 minutes maximum)
     'exp': int(time.time()) + 600,
-    
     # {% data variables.product.prodname_github_app %}'s client ID
     'iss': client_id
 
@@ -120,7 +116,7 @@ encoded_jwt = jwt.encode(payload, signing_key, algorithm='RS256')
 print(f"JWT: {encoded_jwt}")
 ```
 
-This script will prompt you for the file path where your private key is stored and for the ID of your app. Alternatively, you can pass those values as inline arguments when you execute the script.
+This script will prompt you for the file path where your private key is stored and for the client ID of your app. Alternatively, you can pass those values as inline arguments when you execute the script.
 
 ### Example: Using Bash to generate a JWT
 
@@ -130,9 +126,7 @@ This script will prompt you for the file path where your private key is stored a
 ```bash copy
 #!/usr/bin/env bash
 
-set -o pipefail
 client_id=$1 # Client ID as first argument
-
 pem=$( cat $2 ) # file path of the private key as second argument
 
 now=$(date +%s)
@@ -176,7 +170,6 @@ In the following example, replace `YOUR_PATH_TO_PEM` with the file path where yo
 #!/usr/bin/env pwsh
 
 $client_id = YOUR_CLIENT_ID
-
 $private_key_path = "YOUR_PATH_TO_PEM"
 
 $header = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject @{
@@ -187,7 +180,7 @@ $header = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes((Conve
 $payload = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject @{
   iat = [System.DateTimeOffset]::UtcNow.AddSeconds(-10).ToUnixTimeSeconds()
   exp = [System.DateTimeOffset]::UtcNow.AddMinutes(10).ToUnixTimeSeconds()
-   iss = $client_id 
+  iss = $client_id
 }))).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
 $rsa = [System.Security.Cryptography.RSA]::Create()

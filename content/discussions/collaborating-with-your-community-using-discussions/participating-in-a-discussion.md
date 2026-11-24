@@ -7,6 +7,8 @@ versions:
   ghes: '*'
   ghec: '*'
 shortTitle: Participate in discussion
+category:
+  - Participate in discussions
 ---
 
 
@@ -22,12 +24,6 @@ In addition to starting or viewing discussions and polls, you can:
 * Upvote discussions and top-level comments to give them more visibility
 
 {% ifversion fpt or ghec %}You can block users and report disruptive content to maintain a safe and pleasant environment for yourself. For more information, see [AUTOTITLE](/communities/maintaining-your-safety-on-github).{% endif %}
-
-{% ifversion copilot %}
-
-> [!TIP] You can also use {% data variables.copilot.copilot_chat_short %} to generate ideas, outlines, or drafts for discussions based on your recent pull requests and issues. See [AUTOTITLE](/copilot/copilot-chat-cookbook/documenting-code/writing-discussions-or-blog-posts).
-
-{% endif %}
 
 ## Prerequisites
 

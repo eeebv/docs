@@ -1,45 +1,52 @@
 import { fileURLToPath } from 'url'
 import path from 'path'
 import http from 'http'
+import { Socket } from 'net'
 
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import type { Response } from 'express'
 
 import Page from '@/frame/lib/page'
 import findPage from '@/frame/middleware/find-page'
-import type { ExtendedRequest } from '@/types'
+import type { ExtendedRequest, Context } from '@/types'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+type TestResponse = Response & { _status?: number; _message?: string }
 
 function makeRequestResponse(
   url: string,
   currentVersion = 'free-pro-team@latest',
-): [ExtendedRequest, Response & { _status?: number; _message?: string }] {
-  const req = new http.IncomingMessage(null as any) as ExtendedRequest
+): [ExtendedRequest, TestResponse] {
+  const req = new http.IncomingMessage(new Socket()) as ExtendedRequest
+
+  Object.defineProperty(req, 'path', {
+    value: url,
+    writable: true,
+  })
+
   req.method = 'GET'
   req.url = url
-  // @ts-expect-error - path is read-only but we need to set it for testing
-  req.path = url
   req.cookies = {}
   req.headers = {}
 
-  // Custom keys on the request
-  req.pagePath = url
-  req.context = {}
-  req.context.currentVersion = currentVersion
-  req.context.pages = {}
-
-  const res = new http.ServerResponse(req) as Response & {
-    _status?: number
-    _message?: string
+  const context: Context = {
+    currentVersion,
+    pages: {},
   }
-  res.status = function (code: number) {
+
+  req.pagePath = url
+  req.context = context
+
+  const res = new http.ServerResponse(req) as TestResponse
+  res.status = function status(this: TestResponse, code: number) {
     this._status = code
-    return {
+    return Object.assign(this, {
       send: (message: string) => {
         this._message = message
+        return this
       },
-    } as any
+    })
   }
 
   return [req, res]
@@ -56,7 +63,7 @@ describe('find page middleware', () => {
     })
     if (page && req.context) {
       req.context.pages = {
-        '/en/foo/bar': page as any,
+        '/en/foo/bar': page,
       }
     }
 
@@ -88,7 +95,7 @@ describe('find page middleware', () => {
     })
     if (page && req.context) {
       req.context.pages = {
-        '/en/page-with-redirects': page as any,
+        '/en/page-with-redirects': page,
       }
     }
 
@@ -98,6 +105,7 @@ describe('find page middleware', () => {
     })
     expect(req.context?.page).toBeInstanceOf(Page)
   })
+
   test('finds it for non-fpt version URLS', async () => {
     const [req, res] = makeRequestResponse('/en/page-with-redirects', 'enterprise-cloud@latest')
     const page = await Page.init({
@@ -107,7 +115,7 @@ describe('find page middleware', () => {
     })
     if (page && req.context) {
       req.context.pages = {
-        '/en/page-with-redirects': page as any,
+        '/en/page-with-redirects': page,
       }
     }
 
@@ -119,8 +127,7 @@ describe('find page middleware', () => {
   })
 
   test("will 404 if the request version doesn't match the page", async () => {
-    // The 'versions:' frontmatter on 'page-with-redirects.md' does
-    // not include ghes. So this'll eventually 404.
+    // page-with-redirects.md excludes GHES, so enterprise-server@latest eventually 404s.
     const [req, res] = makeRequestResponse('/en/page-with-redirects', 'enterprise-server@latest')
     const page = await Page.init({
       relativePath: 'page-with-redirects.md',
@@ -129,7 +136,7 @@ describe('find page middleware', () => {
     })
     if (page && req.context) {
       req.context.pages = {
-        '/en/page-with-redirects': page as any,
+        '/en/page-with-redirects': page,
       }
     }
 
@@ -141,6 +148,35 @@ describe('find page middleware', () => {
     expect(res._message).toMatch('')
     expect(req.context?.page).toBeUndefined()
   })
+
+  test.each(['/en/../README', '/en/sub\\..\\..\\README', '/en/child/..\\..\\README'])(
+    'does not re-read paths outside the content root: %s',
+    async (url) => {
+      const [req, res] = makeRequestResponse(url)
+      const page = await Page.init({
+        relativePath: 'page-with-redirects.md',
+        basePath: path.join(__dirname, '../../../src/fixtures/fixtures'),
+        languageCode: 'en',
+      })
+      if (page && req.context) {
+        req.context.pages = {
+          [url]: page,
+        }
+      }
+
+      const initSpy = vi.spyOn(Page, 'init')
+      try {
+        await findPage(req, res, () => {}, {
+          isDev: true,
+          contentRoot: path.join(__dirname, '../../../src/fixtures/fixtures'),
+        })
+        expect(initSpy).not.toHaveBeenCalled()
+        expect(req.context?.page).toBe(page)
+      } finally {
+        initSpy.mockRestore()
+      }
+    },
+  )
 
   test('re-reads from disk if in development mode and finds nothing', async () => {
     const [req, res] = makeRequestResponse('/en/never/heard/of')

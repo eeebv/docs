@@ -4,8 +4,6 @@ intro: 'Discover a curated collection of customizations, including custom instru
 allowTitleToDifferFromFilename: true
 versions:
   feature: copilot
-topics:
-  - Copilot
 layout: category-landing
 sidebarLink:
   text: All customizations
@@ -15,8 +13,11 @@ spotlight:
     image: /assets/images/copilot-landing/generating_unit_tests.png
   - article: /prompt-files/your-first-prompt-file
     image: /assets/images/copilot-landing/improving_code_readability.png
-  - article: /custom-instructions/your-first-custom-agent
+  - article: /custom-agents/your-first-custom-agent
     image: /assets/images/copilot-landing/generating_unit_tests.png
+filters:
+  - category
+  - complexity
 children:
   - /custom-instructions
   - /prompt-files

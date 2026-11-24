@@ -1,19 +1,20 @@
-import { describe, expect, test } from 'vitest'
+import type { Response } from 'express'
+import { describe, expect, test, vi } from 'vitest'
 
 import { get } from '@/tests/helpers/e2etest'
 
-import {
+import handleInvalidQuerystrings, {
   MAX_UNFAMILIAR_KEYS_BAD_REQUEST,
   MAX_UNFAMILIAR_KEYS_REDIRECT,
 } from '@/shielding/middleware/handle-invalid-query-strings'
+import type { ExtendedRequest } from '@/types'
 
 const alpha = Array.from(Array(26)).map((e, i) => i + 65)
 const alphabet = alpha.map((x) => String.fromCharCode(x))
 
 describe('invalid query strings', () => {
   test('400 for too many unrecognized query strings', async () => {
-    // This test depends on knowing exactly the number
-    // of unrecognized query strings that will trigger a 400.
+    // The exported threshold keeps this test tied to the middleware limit.
     const sp = new URLSearchParams()
     for (const letter of alphabet.slice(0, MAX_UNFAMILIAR_KEYS_BAD_REQUEST)) {
       sp.set(letter, '1')
@@ -21,13 +22,13 @@ describe('invalid query strings', () => {
     const url = `/?${sp}`
     const res = await get(url)
     expect(res.statusCode).toBe(400)
+    expect(res.headers['content-type']).toMatch('text/plain')
     expect(res.headers['cache-control']).toMatch('no-store')
     expect(res.headers['cache-control']).toMatch('private')
   })
 
   test('302 redirect for many unrecognized query strings', async () => {
-    // This test depends on knowing exactly the number
-    // of unrecognized query strings that will trigger a 400.
+    // The exported threshold keeps this test tied to the middleware limit.
     const sp = new URLSearchParams()
     for (const letter of alphabet.slice(0, MAX_UNFAMILIAR_KEYS_REDIRECT)) {
       sp.set(letter, '1')
@@ -52,12 +53,32 @@ describe('invalid query strings', () => {
     expect(res.headers.location).toBe('/en/pages?platform=concrete')
   })
 
+  test('no redirect for recognized /api/search params', () => {
+    // Call the middleware directly because /api/search proxies to production without Elasticsearch.
+    const query = {
+      query: 'foo',
+      size: '5',
+      sort: 'best',
+      highlights: 'title',
+      debug: '1',
+      include: 'toplevel',
+      toplevel: 'Baring',
+      aggregate: 'toplevel',
+    }
+    const req = { method: 'GET', path: '/api/search/v1', url: '/api/search/v1', query }
+    const res = { set: vi.fn(), hasHeader: vi.fn(), status: vi.fn(), safeRedirect: vi.fn() }
+    const next = vi.fn()
+    handleInvalidQuerystrings(req as unknown as ExtendedRequest, res as unknown as Response, next)
+    expect(res.safeRedirect).not.toHaveBeenCalled()
+    expect(next).toHaveBeenCalledOnce()
+  })
+
   test('root homepage with value-less 8 character query string', async () => {
     const url = `/en?${randomCharacters(8)}`
     const res = await get(url)
     expect(res.statusCode).toBe(302)
     expect(res.headers.location).toBe('/en')
-    // But note that it only applies to the home page!
+    // The 8-character rule applies to root-level paths.
     {
       const nestedUrl = `/en/get-started?${randomCharacters(8)}`
       const nestedRes = await get(nestedUrl)
@@ -69,14 +90,20 @@ describe('invalid query strings', () => {
     const url = `/en?query[foo]=bar`
     const res = await get(url)
     expect(res.statusCode).toBe(400)
-    expect(res.body).toMatch('Invalid query string key (query)')
+    expect(res.headers['content-type']).toMatch('text/plain')
+    expect(res.body).toMatch('Invalid query string')
+    // Do not reflect the user-supplied key name.
+    expect(res.body).not.toContain('(query)')
   })
 
   test('query string keys with square brackets', async () => {
     const url = `/?constructor[foo][bar]=buz`
     const res = await get(url)
     expect(res.statusCode).toBe(400)
-    expect(res.body).toMatch('Invalid query string key (constructor)')
+    expect(res.headers['content-type']).toMatch('text/plain')
+    expect(res.body).toMatch('Invalid query string')
+    // Do not reflect the user-supplied key name.
+    expect(res.body).not.toContain('(constructor)')
   })
 
   test('bad tool query string with Chinese URL-encoded characters', async () => {
@@ -85,6 +112,21 @@ describe('invalid query strings', () => {
     const res = await get(url)
     expect(res.statusCode).toBe(302)
     expect(res.headers.location).toBe('/?tool=azure_data_studio')
+  })
+
+  test('XSS payloads in bracket query keys are not reflected', async () => {
+    const res = await get('/en?%3Cscript%3Ealert()%3C/script%3E[]')
+    expect(res.statusCode).toBe(400)
+    expect(res.headers['content-type']).toMatch('text/plain')
+    expect(res.body).not.toContain('<script>')
+    expect(res.body).not.toContain('alert')
+  })
+
+  // Bug bounty proof of concept: enough unrecognized query keys force a redirect.
+  // safeRedirect normalizes // to / so Location cannot become protocol-relative.
+  test('redirect from unrecognized query strings does not produce open redirect', async () => {
+    const res = await get('//evil.com?a=1&b=2&c=3')
+    expect(res.headers.location).not.toMatch(/^\/\//)
   })
 })
 

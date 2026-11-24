@@ -1,5 +1,7 @@
 import fs from 'fs'
 import path from 'path'
+import { TokenKind } from 'liquidjs'
+import type { TagToken } from 'liquidjs'
 import { getLiquidTokens } from '@/content-linter/lib/helpers/liquid-utils'
 import {
   getAllContentFilePaths,
@@ -21,7 +23,9 @@ export function findUnused({ absolute }: { absolute: boolean }) {
   for (let i = 0; i < totalFiles; i++) {
     const filePath = allFilePaths[i]
     const fileContents = fs.readFileSync(filePath, 'utf-8')
-    const liquidTokens = getLiquidTokens(fileContents)
+    const liquidTokens = getLiquidTokens(fileContents).filter(
+      (token): token is TagToken => token.kind === TokenKind.Tag,
+    )
     for (const token of liquidTokens) {
       const { args, name } = token
       if (
@@ -29,7 +33,7 @@ export function findUnused({ absolute }: { absolute: boolean }) {
         args.startsWith('reusables.')
       ) {
         const reusableName = `${path.join('data', ...args.split(' ')[0].split('.'))}.md`
-        // Special cases where we don't want them to count as reusables. It's an example in a how-to doc
+        // Ignore how-to examples that use fake reusable names.
         if (
           reusableName.includes('foo/bar.md') ||
           reusableName.includes('foo/par.md') ||

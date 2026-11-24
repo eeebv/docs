@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
-import fs from 'fs'
+import fs from 'fs/promises'
 import path from 'path'
 
 import { defaultCacheControl } from './cache-control'
@@ -30,21 +30,16 @@ export default async function manifestJson(req: Request, res: Response, next: Ne
   }
 
   if (req.url !== '/manifest.json') {
-    // E.g. `/manifest.json/anything` or `/manifest.json?foo=bar`
+    // Examples: /manifest.json/anything and /manifest.json?foo=bar.
     defaultCacheControl(res)
-    return res.redirect(302, '/manifest.json')
+    return res.safeRedirect(302, '/manifest.json')
   }
 
   const icons: Icon[] = []
 
-  // This is modelled after https://github.com/manifest.json
+  // The manifest mirrors https://github.com/manifest.json.
   const manifest = {
-    // In the future we might want to have a different manifest for each
-    // language. Particularly, the `name` property.
-    // But as of May 2023, this is overkill because all translations's
-    // home page refer to the name of the site as "GitHub Docs".
-    // For example, on https://docs.github.com/ja the `<title>`
-    // is "GitHub Docs".
+    // Localized home pages title the site GitHub Docs, so one manifest covers every language.
     name: 'GitHub Docs',
     short_name: 'GitHub Docs',
     start_url: '/',
@@ -53,7 +48,7 @@ export default async function manifestJson(req: Request, res: Response, next: Ne
   }
   for (const icon of ICONS) {
     for (const sizes of path.basename(icon).match(/\d+x\d+/g) || []) {
-      const stats = fs.statSync(icon)
+      const stats = await fs.stat(icon)
       const split = icon.slice(1).split(path.sep)
       const hash = `${stats.size}`
       split.splice(2, 0, `cb-${hash}`)

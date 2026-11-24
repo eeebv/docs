@@ -3,30 +3,18 @@ import path from 'path'
 import patterns from './patterns'
 import removeFPTFromPath from '@/versions/lib/remove-fpt-from-path'
 
-/*
-This class creates the "permalinks" that power a page's different versions,
-where the source for the versions is a content file's frontmatter. The
-page.permalinks is an array of objects that looks like this:
-[
-  {
-    "languageCode": "en",
-    "pageVersion": "free-pro-team@latest",
-    "relativePath": "billing/managing-billing-for-your-github-account/index.md",
-    "title": "Managing billing for your GitHub account",
-    "hrefWithoutLanguage": "/billing/managing-billing-for-your-github-account",
-    "href": "/en/billing/managing-billing-for-your-github-account"
-  },
-  {
-    "languageCode": "en",
-    "pageVersion": "enterprise-cloud@latest",
-    "relativePath": "billing/managing-billing-for-your-github-account/index.md",
-    "title": "Managing billing for your GitHub account",
-    "hrefWithoutLanguage": "/enterprise-cloud@latest/billing/managing-billing-for-your-github-account",
-    "href": "/en/enterprise-cloud@latest/billing/managing-billing-for-your-github-account"
-  }
-  ... and so on for each of the content file's supported versions.
-]
-*/
+// Permalinks derive one language-scoped href for each supported content version.
+// Intern only low-cardinality fields across about 975K Permalink instances.
+// High-cardinality fields like relativePath and title would make the pool grow without bound.
+const stringPool = new Map<string, string>()
+
+function intern(s: string): string {
+  const pooled = stringPool.get(s)
+  if (pooled !== undefined) return pooled
+  stringPool.set(s, s)
+  return s
+}
+
 class Permalink {
   languageCode: string
   pageVersion: string
@@ -36,8 +24,8 @@ class Permalink {
   href: string
 
   constructor(languageCode: string, pageVersion: string, relativePath: string, title: string) {
-    this.languageCode = languageCode
-    this.pageVersion = pageVersion
+    this.languageCode = intern(languageCode)
+    this.pageVersion = intern(pageVersion)
     this.relativePath = relativePath
     this.title = title
 
@@ -71,10 +59,7 @@ class Permalink {
 
   static relativePathToSuffix(relativePath: string): string {
     if (relativePath === 'index.md') return '/'
-    // When you turn `foo/bar.md`, which is a file path, into a URL pathname,
-    // you just need to chop off the `.md` suffix.
-    // For `foo/parent/index.md` you can't just chop off the `index.md`
-    // because it would leave a trailing `/`.
+    // index.md paths drop the whole suffix to avoid a trailing slash.
     return `/${relativePath.replace(indexmdSuffixRegex, '').replace(mdSuffixRegex, '')}`
   }
 }

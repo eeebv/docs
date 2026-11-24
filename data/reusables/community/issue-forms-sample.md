@@ -5,8 +5,8 @@ title: "[Bug]: "
 labels: ["bug", "triage"]
 projects: ["octo-org/1", "octo-org/44"]
 assignees:
-  - octocat{% ifversion issue-types %}
-type: bug{% endif %}
+  - octocat
+type: bug
 body:
   - type: markdown
     attributes:
@@ -63,5 +63,12 @@ body:
       description: By submitting this issue, you agree to follow our [Code of Conduct](https://example.com).
       options:
         - label: I agree to follow this project's Code of Conduct
-          required: true
+          required: true{% ifversion issue-form-upload %}
+  - type: upload
+    id: screenshots
+    attributes:
+      label: Upload screenshots
+      description: If applicable, add screenshots to help explain your problem.
+    validations:
+      required: false{% endif %}
 ```

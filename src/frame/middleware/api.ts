@@ -1,6 +1,7 @@
 import express from 'express'
 import { createProxyMiddleware } from 'http-proxy-middleware'
 
+import { createLogger } from '@/observability/logger'
 import events from '@/events/middleware'
 import anchorRedirect from '@/rest/api/anchor-redirect'
 import aiSearch from '@/search/middleware/ai-search'
@@ -11,7 +12,9 @@ import article from '@/article-api/middleware/article'
 import webhooks from '@/webhooks/middleware/webhooks'
 import { ExtendedRequest } from '@/types'
 import { noCacheControl } from './cache-control'
+import { STAFFONLY_COOKIE_NAME } from '@/frame/lib/constants'
 
+const logger = createLogger(import.meta.url)
 const router = express.Router()
 
 router.use('/events', events)
@@ -20,16 +23,12 @@ router.use('/anchor-redirect', anchorRedirect)
 router.use('/pagelist', pageList)
 router.use('/article', article)
 
-// The purpose of this is for convenience to everyone who runs this code
-// base locally but don't have an Elasticsearch server locally.
-// In production, this env var is always set but perhaps in a writer's
-// local laptop, they don't have an Elasticsearch. Neither a running local
-// server or the known credentials to a remote Elasticsearch. Whenever
-// that's the case, they can just HTTP proxy to the production server.
+// Local development proxies AI Search to docs.github.com when CSE_COPILOT_ENDPOINT
+// is unset, so writers do not need a local AI Search service.
 if (process.env.CSE_COPILOT_ENDPOINT || process.env.NODE_ENV === 'test') {
   router.use('/ai-search', aiSearch)
 } else {
-  console.log(
+  logger.info(
     'Proxying AI Search requests to docs.github.com. To use the cse-copilot endpoint, set the CSE_COPILOT_ENDPOINT environment variable.',
   )
   router.use(aiSearchLocalProxy)
@@ -49,18 +48,16 @@ if (process.env.ELASTICSEARCH_URL) {
   )
 }
 
-// We need access to specific httpOnly cookies set on github.com from the client
-// The only way to access these on the client is to fetch them from the server
-// Limit this endpoint to 1req/min because a client should only call this route once
+// Browser JavaScript cannot read github.com httpOnly cookies.
+// The server endpoint returns the staff flag that client code needs.
 router.get('/cookies', (req, res) => {
   noCacheControl(res)
   const cookies = {
-    isStaff: Boolean(req.cookies?.staffonly?.startsWith('yes')) || false,
+    isStaff: Boolean(req.cookies?.[STAFFONLY_COOKIE_NAME]?.startsWith('yes')) || false,
   }
   res.json(cookies)
 })
 
-// Handle root /api requests
 router.get('/', (req, res) => {
   res.status(404).json({ error: `${req.path} not found` })
 })

@@ -1,6 +1,6 @@
 ---
 title: Sudo mode
-intro: 'To confirm access to your account before you perform a potentially sensitive action, {% data variables.location.product_location %} prompts for authentication.'
+intro: 'To confirm access to your account before you perform a protected high-impact action, {% data variables.location.product_location %} prompts for authentication.'
 redirect_from:
   - /articles/sudo-mode
   - /github/authenticating-to-github/sudo-mode
@@ -9,19 +9,22 @@ versions:
   fpt: '*'
   ghes: '*'
   ghec: '*'
-topics:
-  - Identity
-  - Access management
+category:
+  - Manage access credentials
 ---
 
 ## About sudo mode
 
-To maintain the security of your account when you perform a potentially sensitive action on {% data variables.location.product_location %}, you must authenticate even though you're already signed in. For example, {% data variables.product.company_short %} considers the following actions sensitive because each action could allow a new person or system to access your account.
+To maintain the security of your account when you perform a protected high-impact action on {% data variables.location.product_location %}, you must authenticate even though you're already signed in. {% data variables.product.company_short %} requires authentication for actions that can affect access to accounts and resources, including but not limited to:
 
-* Modification of an associated email address
-* Authorization of a third-party application
-* Addition of a new SSH key
-* Creation of a PAT or application
+* **Account**: Deleting your user account, modifying an associated email address, adding a new SSH key, or authorizing third-party applications
+* **Developer settings**: Generating or removing a client secret, creating {% data variables.product.pat_generic_plural %}, revoking all tokens, or transferring a {% data variables.product.prodname_oauth_app %}
+* **Webhooks**: Creating, viewing, editing, or deleting repository, organization, or enterprise webhooks; viewing or redelivering webhook deliveries
+* **Organization membership**: Sending or editing organization invitations, adding members directly, adding team members, or changing team roles
+* **Organization security**: Changing two-factor authentication enforcement or other organization security settings
+* **Enterprise settings**: Creating organizations in an enterprise or changing app access settings for an identity provider (IdP) IP allow list
+* **Rulesets**: Creating and modifying rulesets at organization and repository level.
+* **Recovery codes**: Viewing, downloading, printing, or regenerating authentication or SSO recovery codes
 
 After you authenticate to perform a sensitive action, your session is temporarily in "sudo mode." In sudo mode, you can perform sensitive actions without authentication. {% data variables.product.github %} has a two-hour session timeout period before prompting you for authentication again. During this time, any sensitive action that you perform will reset the timer.
 
@@ -38,7 +41,15 @@ After you authenticate to perform a sensitive action, your session is temporaril
 
 {% endif %}
 
-"sudo" is a reference to a program on Unix systems, where the name is short for "**su**peruser **do**." For more information, see [sudo](https://wikipedia.org/wiki/Sudo) on Wikipedia.
+{% ifversion proof-of-presence %}
+
+## Proof of Presence for enterprise actions
+
+Enterprises can extend sudo mode with Proof of Presence (PoP). For protected high-impact actions, PoP requires you to reauthenticate through your enterprise's identity provider before the action can proceed. Follow the identity provider's prompts, including any required multi-factor authentication, then return to {% data variables.product.github %} to complete the action.
+
+{% data reusables.enterprise-accounts.proof-of-presence-supported-idps %} For more information, see [AUTOTITLE](/admin/configuring-settings/hardening-security-for-your-enterprise/configuring-proof-of-presence).
+
+{% endif %}
 
 ## Confirming access for sudo mode
 

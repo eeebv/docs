@@ -1,7 +1,7 @@
 ---
 title: About cluster nodes
 product: '{% data reusables.gated-features.cluster %}'
-intro: 'In a {% data variables.product.prodname_ghe_server %} cluster, nodes are individual virtual machines (VMs) running the {% data variables.product.prodname_ghe_server %} software that comprise the instance. Each node runs a set of services.'
+intro: In a {% data variables.product.prodname_ghe_server %} cluster, nodes are individual virtual machines (VMs) running the {% data variables.product.prodname_ghe_server %} software that comprise the instance. Each node runs a set of services.
 redirect_from:
   - /enterprise/admin/clustering/about-cluster-nodes
   - /enterprise/admin/enterprise-management/about-cluster-nodes
@@ -10,10 +10,9 @@ redirect_from:
   - /admin/monitoring-managing-and-updating-your-instance/configuring-clustering/about-cluster-nodes
 versions:
   ghes: '*'
-type: overview
-topics:
-  - Clustering
-  - Enterprise
+contentType: concepts
+category:
+  - Scale your instance
 ---
 
 ## About {% data variables.product.prodname_ghe_server %} cluster nodes
@@ -56,6 +55,10 @@ The following example demonstrates a minimal cluster configuration, which includ
 ## Cluster design recommendations
 
 Clustering allows services that make up {% data variables.product.prodname_ghe_server %} to be scaled out independently of each other. This flexibility can be used to design and implement a cluster that fits organizations with different scalability requirements. For example, some organizations may need more storage throughput for large or frequent fetches, but web server usage may be relatively low. Another organization may have good performance with fewer storage resources, but need many nodes running `pages-server` or `elasticsearch-server`. Many different combinations are possible. Work with your account representative to determine the best cluster configuration for your specific needs.
+
+{% ifversion dedicated-redis-cluster-node %}
+To separate the Redis primary's resources and data volume from other services, you can move the primary to a dedicated cluster node while retaining Redis replicas on existing nodes. See [AUTOTITLE](/admin/monitoring-and-managing-your-instance/configuring-clustering/moving-redis-to-a-dedicated-cluster-node).
+{% endif %}
 
 * Spread redundant nodes across independent hardware. If you share CPU, memory, or storage devices, you'll reduce performance and introduce single points of failure. Shared networking components can also reduce throughput and increase risk of loss of connectivity in the event of an outage.
 * Use fast storage. Storage area networks (SAN) are often optimized for maximum space utilization, availability and fault tolerance, not absolute throughput. {% data variables.product.prodname_ghe_server %} clustering provides redundancy and availability, and will perform best on the fastest storage available. Local SSD storage is recommended.

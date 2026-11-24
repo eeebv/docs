@@ -4,14 +4,13 @@ export interface Parameter {
   description: string
   required: boolean
   schema: {
-    type: string
+    type: string | string[]
     default?: string
     enum?: Array<string>
   }
 }
 
 export interface BodyParameter {
-  in: string
   name: string
   description: string
   type: string
@@ -26,7 +25,7 @@ export interface ChildParameter {
   description: string
   type?: string
   isRequired?: boolean
-  enum?: Array<string | null>
+  enum?: Array<string | number | boolean | null>
   default?: string | boolean | number | undefined | string[]
   childParamsGroups?: ChildParameter[]
   oneOfObject?: boolean

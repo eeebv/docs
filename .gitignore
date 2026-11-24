@@ -13,8 +13,7 @@
 # JetBrains IDE files
 .idea/
 
-# Tracks package-lock.json installation state
-.installed.package-lock.json
+
 
 # Linkinator full site link check results
 .linkinator/
@@ -24,9 +23,7 @@
 
 # Node.js version specification
 .node-version
-
-# Precomputed page info cache (brotli compressed)
-.pageinfo-cache.json.br
+.nvmrc
 
 # getRemoteJSON() disk cache for archived content
 .remotejson-cache/
@@ -107,3 +104,11 @@ tmp/
 
 # Localized content from translation repositories
 translations/
+
+# Shared local volume (bufo)
+.local
+docs-ghes-3.14/
+docs-ghes-3.15/
+
+# Local output from the internal link checker
+artifacts/

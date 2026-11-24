@@ -6,11 +6,9 @@ redirect_from:
   - /github/setting-up-and-managing-organizations-and-teams/connecting-your-identity-provider-to-your-organization
 versions:
   ghec: '*'
-topics:
-  - Authentication
-  - Organizations
-  - Teams
 shortTitle: Connect an IdP
+category:
+  - Configure SAML single sign-on
 ---
 
 ## About connection of your IdP to your organization
@@ -18,6 +16,8 @@ shortTitle: Connect an IdP
 When you enable SAML SSO for your {% data variables.product.github %} organization, you connect your identity provider (IdP) to your organization. For more information, see [AUTOTITLE](/organizations/managing-saml-single-sign-on-for-your-organization/enabling-and-testing-saml-single-sign-on-for-your-organization).
 
 {% data reusables.saml.ghec-only %}
+
+## Supported identity providers
 
 You can find the SAML and SCIM implementation details for your IdP in the IdP's documentation.
 * Microsoft Active Directory Federation Services (AD FS) [SAML](https://docs.microsoft.com/windows-server/identity/active-directory-federation-services)
@@ -27,11 +27,12 @@ You can find the SAML and SCIM implementation details for your IdP in the IdP's 
 * PingOne [SAML](https://support.pingidentity.com/s/marketplace-integration/a7i1W0000004ID3QAM/github-connector)
 * Shibboleth [SAML](https://shibboleth.atlassian.net/wiki/spaces/IDP4/overview)
 
-> [!NOTE]
-> {% data variables.product.github %}'s supported identity providers for SCIM are Entra ID, Okta, and OneLogin. For more information about SCIM, see [AUTOTITLE](/organizations/managing-saml-single-sign-on-for-your-organization/about-scim-for-organizations).
->
-> {% data reusables.scim.enterprise-account-scim %}
+{% data reusables.enterprise-accounts.gov-cloud-idp-not-supported %}
+
+{% data variables.product.github %}'s supported identity providers for SCIM are Entra ID, Okta, and OneLogin. For more information about SCIM, see [AUTOTITLE](/organizations/managing-saml-single-sign-on-for-your-organization/about-scim-for-organizations).
+
+{% data reusables.scim.enterprise-account-scim %}
 
 ## SAML metadata
 
-For more information about SAML metadata for your organization, see [AUTOTITLE](/admin/identity-and-access-management/using-saml-for-enterprise-iam/saml-configuration-reference).
+For more information about SAML metadata for your organization, see [AUTOTITLE](/admin/managing-iam/iam-configuration-reference/saml-configuration-reference).

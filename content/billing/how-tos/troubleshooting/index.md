@@ -6,10 +6,9 @@ versions:
   fpt: '*'
   ghec: '*'
   ghes: '*'
-topics:
-  - Billing
 children:
   - /declined-card
+  - /authorization-holds
   - /locked-account
   - /azure-sub-connection
   - /enterprise-license-usage

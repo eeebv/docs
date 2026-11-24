@@ -1,4 +1,4 @@
-import { SearchHighlight } from '@elastic/elasticsearch/lib/api/types'
+import type { estypes } from '@elastic/elasticsearch'
 
 import type { HighlightOptions } from '@/search/lib/search-request-params/types'
 
@@ -14,17 +14,14 @@ export type HighlightFields = {
   [key in HighlightOptions]: HighlightConfig
 }
 
-// When we query Elasticsearch, we can specify a highlight configuration
 export function getHighlightConfiguration(
   query: string,
   highlightsFields: HighlightOptions[],
-): SearchHighlight {
+): estypes.SearchHighlight {
   const fields = {} as HighlightFields
   if (highlightsFields.includes('title')) {
     fields.title = {
-      // Fast Vector Highlighter
-      // Using this requires that you first index these fields
-      // with {term_vector: 'with_positions_offsets'}
+      // fvh requires term_vector: with_positions_offsets on the indexed field.
       type: 'fvh',
       fragment_size: 200,
       number_of_fragments: 1,
@@ -32,13 +29,11 @@ export function getHighlightConfiguration(
   }
   if (highlightsFields.includes('content')) {
     fields.content = {
-      // Fast Vector Highlighter
-      // Using this requires that you first index these fields
-      // with {term_vector: 'with_positions_offsets'}
+      // fvh requires term_vector: with_positions_offsets on the indexed field.
       type: 'fvh',
       fragment_size: 150,
       number_of_fragments: 1,
-      // So we can at least display something if there was no highlight match within the content.
+      // Fallback snippets show text even when Elasticsearch finds no content highlight.
       no_match_size: 150,
 
       highlight_query: {
@@ -50,9 +45,7 @@ export function getHighlightConfiguration(
       },
     }
     fields.content_explicit = {
-      // Fast Vector Highlighter
-      // Using this requires that you first index these fields
-      // with {term_vector: 'with_positions_offsets'}
+      // fvh requires term_vector: with_positions_offsets on the indexed field.
       type: 'fvh',
       fragment_size: 150,
       number_of_fragments: 1,
@@ -69,14 +62,12 @@ export function getHighlightConfiguration(
   }
   if (highlightsFields.includes('term')) {
     fields.term = {
-      // Fast Vector Highlighter
-      // Using this requires that you first index these fields
-      // with {term_vector: 'with_positions_offsets'}
+      // fvh requires term_vector: with_positions_offsets on the indexed field.
       type: 'fvh',
     }
   }
 
-  const highlightConfig: SearchHighlight = {
+  const highlightConfig: estypes.SearchHighlight = {
     pre_tags: ['<mark>'],
     post_tags: ['</mark>'],
     fields,

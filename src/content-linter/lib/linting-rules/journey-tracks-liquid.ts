@@ -9,12 +9,10 @@ export const journeyTracksLiquid = {
   description: 'Journey track properties must use valid Liquid syntax',
   tags: ['frontmatter', 'journey-tracks', 'liquid'],
   function: (params: RuleParams, onError: RuleErrorCallback) => {
-    // Using any for frontmatter as it's a dynamic YAML object with varying properties
-    const fm: any = getFrontmatter(params.lines)
+    const fm: Record<string, unknown> = getFrontmatter(params.lines) as Record<string, unknown>
     if (!fm || !fm.journeyTracks || !Array.isArray(fm.journeyTracks)) return
     if (!fm.layout || fm.layout !== 'journey-landing') return
 
-    // Find the base journeyTracks line
     const journeyTracksLine: string | undefined = params.lines.find((line: string) =>
       line.trim().startsWith('journeyTracks:'),
     )
@@ -23,18 +21,15 @@ export const journeyTracksLiquid = {
       : 1
 
     for (let trackIndex = 0; trackIndex < fm.journeyTracks.length; trackIndex++) {
-      const track: any = fm.journeyTracks[trackIndex]
-      // Try to find the line number for this specific journey track so we can use that for the error
-      // line number.  Getting the exact line number is probably more work than it's worth for this
-      // particular rule.
+      const track = (fm.journeyTracks as Array<Record<string, unknown>>)[trackIndex]
+      // Approximate the track location instead of parsing every nested frontmatter node.
 
-      // Look for the track by finding the nth occurrence of track-like patterns after journeyTracks
       let trackLineNumber: number = baseLineNumber
       if (journeyTracksLine) {
         let trackCount: number = 0
         for (let i = params.lines.indexOf(journeyTracksLine) + 1; i < params.lines.length; i++) {
           const line: string = params.lines[i].trim()
-          // Look for track indicators (array item with id, title, or description)
+          // Track entries can start with id, title, or a bare array marker followed by id or title.
           if (
             line.startsWith('- id:') ||
             line.startsWith('- title:') ||
@@ -52,21 +47,22 @@ export const journeyTracksLiquid = {
         }
       }
 
-      // Simple validation - just check if liquid can parse each string property
+      // Liquid parsing is the rule's only validation.
       const properties = [
         { name: 'title', value: track.title },
         { name: 'description', value: track.description },
+        { name: 'timeCommitment', value: track.timeCommitment },
       ]
 
       for (const prop of properties) {
         if (prop.value && typeof prop.value === 'string') {
           try {
             liquid.parse(prop.value)
-          } catch (error: any) {
+          } catch (error: unknown) {
             addError(
               onError,
               trackLineNumber,
-              `Invalid Liquid syntax in journey track ${prop.name} (track ${trackIndex + 1}): ${error.message}`,
+              `Invalid Liquid syntax in journey track ${prop.name} (track ${trackIndex + 1}): ${error instanceof Error ? error.message : String(error)}`,
               prop.value,
             )
           }
@@ -75,16 +71,35 @@ export const journeyTracksLiquid = {
 
       if (track.guides && Array.isArray(track.guides)) {
         for (let guideIndex = 0; guideIndex < track.guides.length; guideIndex++) {
-          const guide: string = track.guides[guideIndex]
-          if (typeof guide === 'string') {
+          const guideObj = track.guides[guideIndex]
+
+          if (!guideObj || typeof guideObj !== 'object') continue
+
+          if ('href' in guideObj && typeof guideObj.href === 'string') {
             try {
-              liquid.parse(guide)
-            } catch (error: any) {
+              liquid.parse(guideObj.href)
+            } catch (error: unknown) {
               addError(
                 onError,
                 trackLineNumber,
-                `Invalid Liquid syntax in journey track guide (track ${trackIndex + 1}, guide ${guideIndex + 1}): ${error.message}`,
-                guide,
+                `Invalid Liquid syntax in journey track guide href (track ${trackIndex + 1}, guide ${guideIndex + 1}): ${error instanceof Error ? error.message : String(error)}`,
+                guideObj.href,
+              )
+            }
+          }
+
+          if (
+            'alternativeNextStep' in guideObj &&
+            typeof guideObj.alternativeNextStep === 'string'
+          ) {
+            try {
+              liquid.parse(guideObj.alternativeNextStep)
+            } catch (error: unknown) {
+              addError(
+                onError,
+                trackLineNumber,
+                `Invalid Liquid syntax in journey track guide alternativeNextStep (track ${trackIndex + 1}, guide ${guideIndex + 1}): ${error instanceof Error ? error.message : String(error)}`,
+                guideObj.alternativeNextStep,
               )
             }
           }

@@ -1,4 +1,4 @@
-import type { SearchTotalHits } from '@elastic/elasticsearch/lib/api/types'
+import type { estypes } from '@elastic/elasticsearch'
 
 import type {
   AdditionalIncludes,
@@ -7,7 +7,6 @@ import type {
 
 export type SearchTypes = 'generalSearch' | 'aiSearchAutocomplete'
 
-// Responses to API routes
 export interface GeneralSearchResponse {
   meta: SearchResultsMeta & {
     page: number
@@ -26,7 +25,6 @@ export interface CombinedSearchResponse {
   generalSearchResults: GeneralSearchResponse
 }
 
-// Response to middleware /search route
 export interface SearchOnReqObject<Type extends SearchTypes> {
   searchParams: ComputedSearchQueryParamsMap[Type]
   validationErrors: SearchValidationErrorEntry[]
@@ -39,13 +37,11 @@ export interface SearchValidationErrorEntry {
   field?: string
 }
 
-// - - - Types for building the search responses - - -
 export interface GeneralSearchHitWithoutIncludes {
   id: string
   url: string
   title: string
   breadcrumbs: string
-  topics?: string[]
   score?: number
   popularity?: number
   es_url?: string
@@ -73,7 +69,7 @@ export type SearchResultAggregations = {
 }
 
 type SearchResultsMeta = {
-  found: SearchTotalHits
+  found: estypes.SearchTotalHits
   took: {
     query_msec: number
     total_msec: number

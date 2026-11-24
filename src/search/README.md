@@ -51,7 +51,7 @@ The workflow runs are only accessible to GitHub employees using internal resourc
 
 ## Manually triggering the search index update workflow
 
-You can manually run the workflow to generate the indexes after you push your changes to `main` to speed up the indexing when needed. It's recommended to do this for only the `free-pro-team@latest` version and the `en` language because running all languages and versions takes about 40 minutes. To run it manually, click "Run workflow" button in the Actions tab. Enter the language and version you'd like to generate the indexes for as inputs to the workflow. By default, all languages and versions are generated.
+You can manually run the workflow to generate the indexes after you push your changes to `main` to speed up the indexing when needed. It's recommended to do this for only the `fpt` version and the `en` language because running all languages and versions takes about 40 minutes. To run it manually, click "Run workflow" button in the Actions tab. Enter the language and version you'd like to generate the indexes for as inputs to the workflow. By default, all languages and versions are generated.
 
 ### Build and sync
 
@@ -62,7 +62,7 @@ The preferred way to build and sync the search indices is to do so via the [GitH
 ### Actions workflow files
 
 - [`.github/workflows/index-general-search.yml`](/.github/workflows/index-general-search.yml) - Populates search indices for **general search** using the `main` branch every four hours. Search indices are stored in an internal-only Elasticsearch instance. To run it manually, click "Run workflow" button in the Actions tab.
-- [`.github/workflows/index-autocomplete-search.yml`](/.github/workflows/index-general-search.yml) - Populates search indices for **AI search autocomplete** using data from an internal repo. Runs daily.
+- [`.github/workflows/index-autocomplete-search.yml`](/.github/workflows/index-autocomplete-search.yml) - Populates search indices for **AI search autocomplete** using data from an internal repo. Runs every weekday and when GHES releases change in `src/versions/lib/enterprise-server-releases.ts`.
 
 ### Notable code files and directories
 
@@ -80,3 +80,87 @@ The preferred way to build and sync the search indices is to do so via the [GitH
 - Our search querying has lots of controls for customizing each index, so we can add weights to certain attributes and create rules like "title is more important than body", etc. But it works pretty well as-is without any configuration.
 - Our search querying has support for "advanced query syntax" for exact matching of quoted expressions and exclusion of words preceded by a `-` sign. This is off by default, but it is enabled in our browser client. The settings in the web interface can be overridden by the search endpoint. See [middleware/search.ts](middleware/search.ts).
 - When needed, the Docs Engineering team can commit updates to the search index, as long as the label `skip-index-check` is applied to the PR.
+
+## Ownership & On-call
+
+### Ownership
+- **Team**: Docs Engineering
+- **Primary contacts**: @docs-engineering (GitHub team)
+- **Search infrastructure**: Internal Elasticsearch cluster for autocomplete and general search results, and an external RAG app ([cse-copilot](https://github.com/github/cse-copilot)) owned by @github/customer-success-engineering for LLM-generated responses
+- **Slack**: #technical-content
+
+### On-call procedures
+If search is not working:
+1. **Check search health**
+   - Test search on docs.github.com
+   - Check Elasticsearch cluster status (internal)
+   - Review recent deploys and index updates
+
+2. **Index issues**
+   - Check `.github/workflows/index-general-search.yml` logs
+   - Verify last successful index run
+   - Test manual index update for single version/language
+
+3. **API issues**
+   - Check `/api/search/v1` endpoint
+   - Review middleware logs for errors
+   - Test search queries directly against API
+
+## Roadmap Items
+
+### High priority improvements
+- **Real-time indexing** - Reduce lag between content changes and search index
+- **Relevance tuning** - Improve search result ranking and quality
+- **Performance optimization** - Faster search queries and results
+- **Version handling** - Better support for version-specific search
+- **Language support** - Improve multilingual search quality
+
+### Medium priority enhancements
+- **Faceted search** - Filter by product, version, content type
+- **Search analytics** - Track what users are searching for
+- **Did you mean** - Suggest corrections for misspellings
+- **Related searches** - Show similar or related queries
+- **Result previews** - Better snippets and highlighting
+
+### AI search improvements
+- **Query understanding** - Better interpret user intent
+- **Answer generation** - Provide direct answers, not just links
+- **Contextual results** - Consider user's current page/version
+- **Personalization** - Learn from search patterns
+
+### Technical improvements
+- **Index efficiency** - Reduce index size and update time
+- **Cache optimization** - Improve query caching
+- **API versioning** - Stable search API with version control
+- **Testing coverage** - More comprehensive search tests
+- **Error handling** - Better error messages and recovery
+
+### Infrastructure enhancements
+- **Elasticsearch upgrade** - Keep cluster up to date
+- **Redundancy** - Improve search availability
+- **Monitoring** - Better observability of search health
+- **Cost optimization** - Reduce Elasticsearch costs
+
+### Content quality
+- **Index validation** - Ensure all pages are indexed correctly
+- **Freshness indicators** - Show when content was last updated
+- **Broken link detection** - Identify 404s in search results
+- **Duplicate detection** - Prevent duplicate results
+
+Search is largely KTLO (keep the lights on). We will continue to ensure the search is working as expected and support updates to both Elasticsearch and Copilot models underlying our search.
+
+## Known Limitations
+
+### Current constraints
+- **Index lag** - 24-hour delay between content changes and search updates
+- **Manual triggers** - Urgent updates require manual workflow run
+- **Full reindex** - Can't update individual pages incrementally
+- **Version complexity** - Hard to search across all versions simultaneously
+
+### Performance considerations
+- Full index rebuild takes ~40 minutes for all versions/languages
+- Single version/language takes ~5-10 minutes
+- Search queries cached but cache can become stale
+- High search volume can impact Elasticsearch cluster
+
+

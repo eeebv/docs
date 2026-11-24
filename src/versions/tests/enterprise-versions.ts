@@ -2,8 +2,16 @@ import { describe, expect, test } from 'vitest'
 
 import patterns from '@/frame/lib/patterns'
 import EnterpriseServerReleases from '@/versions/lib/enterprise-server-releases'
-const { supported, deprecated, all, latest, oldestSupported, nextDeprecationDate } =
-  EnterpriseServerReleases
+const {
+  supported,
+  deprecated,
+  all,
+  latest,
+  oldestSupported,
+  nextDeprecationDate,
+  releasesWithOldestDeprecationDate,
+  dates,
+} = EnterpriseServerReleases
 
 describe('enterpriseServerReleases module', () => {
   test('includes an array of `supported` versions', async () => {
@@ -36,5 +44,19 @@ describe('enterpriseServerReleases module', () => {
 
   test('has a `nextDeprecationDate` property', async () => {
     expect(nextDeprecationDate).toMatch(patterns.ymd)
+  })
+
+  test('has a `releasesWithOldestDeprecationDate` property', async () => {
+    expect(Array.isArray(releasesWithOldestDeprecationDate)).toBe(true)
+    expect(releasesWithOldestDeprecationDate.length).toBeGreaterThan(0)
+    expect(releasesWithOldestDeprecationDate).toContain(oldestSupported)
+  })
+
+  test('has `dates` for every supported and deprecated version', async () => {
+    for (const version of all) {
+      expect(dates[version], version).toBeDefined()
+      expect(dates[version].releaseDate, version).toMatch(patterns.ymd)
+      expect(dates[version].deprecationDate, version).toMatch(patterns.ymd)
+    }
   })
 })

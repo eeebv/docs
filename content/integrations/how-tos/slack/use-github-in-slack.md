@@ -1,16 +1,23 @@
 ---
 title: Using GitHub in Slack
 shortTitle: Use GitHub in Slack
-intro: 'Learn how to use GitHub in Slack to improve collaboration and streamline your workflow.'
+intro: Learn how to use GitHub in Slack to improve collaboration and streamline your workflow.
 versions:
-    fpt: '*'
-    ghes: '*'
-    ghec: '*'
-topics:
-    - Integration
+  fpt: '*'
+  ghes: '*'
+  ghec: '*'
+category:
+  - Use integrations
+contentType: how-tos
 ---
 
 The {% data variables.product.github %} integration for Slack allows you to connect your {% data variables.product.github %} account to the {% data variables.product.github %} app in Slack. Once connected, you can use slash commands to interact with {% data variables.product.github %}, receive notifications about repository activity, and collaborate with your team directly within Slack.
+
+{% ifversion copilot %}
+
+You can also use the {% data variables.product.github %} integration to initiate and steer {% data variables.copilot.copilot_cloud_agent %} sessions in a conversation, including asking {% data variables.product.prodname_copilot_short %} to perform deep research, planning and triage tasks within a thread. Teammates can collaborate with each other and the agent, add context, correct assumptions, continue an agent task, and review the resulting artifacts. You can also select the model, connect MCP servers, work across multiple repositories in one session, and benefit from {% data variables.copilot.copilot_memory %}.
+
+{% endif %}
 
 ## Connecting your {% data variables.product.github %} account to the {% data variables.product.github %} app in Slack
 
@@ -28,25 +35,68 @@ To use a slash command, type `/github` followed by the command you want to execu
 |Command|Description|
 |-------|-----------|
 |`/github help`|Displays a list of essential commands and their descriptions.|
-|`/github subscribe owner/repo`|Subscribes the channel to notifications for the specified repository.|
-|`/github unsubscribe owner/repo`|Unsubscribes the channel from notifications for the specified repository.|
+|`/github subscribe OWNER/REPO`|Subscribes the channel to notifications for the specified repository.|
+|`/github unsubscribe OWNER/REPO`|Unsubscribes the channel from notifications for the specified repository.|
 |`/github subscribe list`|Lists all repositories the channel is subscribed to.|
-|`/github open owner/repo`|Opens an issue in the specified repository. You will be prompted to provide a title and description for the issue.|
-|`/github close [issue link]`|Closes the specified issue as completed.|
-|`/github close [issue link] reason:"not planned"`|Closes the specified issue with a reason. Replace `"not planned"` with your reason.|
-|`/github reopen [issue link]`|Reopens the specified issue.|
+|`/github open OWNER/REPO`|Opens an issue in the specified repository. You will be prompted to provide a title and description for the issue.|
+|`/github close [ISSUE-LINK]`|Closes the specified issue as completed.|
+|`/github close [ISSUE-LINK] reason:"NOT-PLANNED"`|Closes the specified issue with a reason. Replace `"NOT-PLANNED"` with your reason.|
+|`/github reopen [ISSUE-LINK]`|Reopens the specified issue.|
+|`/github signin`|Restarts the "Connect your {% data variables.product.github %} account" workflow.|
+|`/github signout`|Disconnects your {% data variables.product.github %} account from your Slack user.|
 
 >[!NOTE] When you subscribe a channel to a repository, the channel will receive notifications for all `open`, `close`, and `reopen` events on pull requests and issues in that repository. The channel will also receive notifications of any `push` events directly to the repository's default branch.
 
-{% ifversion fpt or ghec %}
+{% ifversion copilot %}
 
-## Initiating {% data variables.copilot.copilot_coding_agent %} sessions within Slack
+To change the repositories, default owner, or default model for new conversations in a channel, run `@{% data variables.product.github %} settings`. These defaults are separate from repository notification subscriptions. To change the model only for the current conversation, ask {% data variables.product.prodname_copilot_short %} to choose a model.
 
-The {% data variables.product.github %} app also integrates {% data variables.copilot.copilot_coding_agent %} into Slack. You can use this functionality to summon {% data variables.copilot.copilot_coding_agent %} in threads where important discussions are taking place, and ask it to make changes based on the context of those discussions. See: [AUTOTITLE](/copilot/how-tos/use-copilot-agents/coding-agent/integrate-coding-agent-with-slack).
+## Initiating {% data variables.copilot.copilot_cloud_agent %} sessions within Slack
+
+The {% data variables.product.github %} integration includes {% data variables.copilot.copilot_cloud_agent %} in Slack. You can summon {% data variables.product.prodname_copilot %} in threads where discussions are taking place and ask it to make changes based on the context of those discussions.
+
+Use {% data variables.product.prodname_copilot_short %} in direct messages, threads, and channels. Besides creating issues, pull requests and other artifacts, working with {% data variables.product.prodname_copilot_short %} in Slack allows you to:
+
+* Move from discussion to investigation, planning, and implementation.
+* Ask questions, investigate failures, and steer an agent together with teammates.
+* Delegate work from any device and let tasks run asynchronously.
+* Choose the model, connect MCP servers, and work across multiple repositories.
+* Use {% data variables.copilot.copilot_memory %} to help {% data variables.product.prodname_copilot_short %} learn from your work over time.
+* Review the resulting work in the open, then resume it outside of Slack, in {% data variables.product.github %}, the terminal, or your preferred code editor.
+
+For example:
+
+```text
+@{% data variables.product.github %} Investigate this failed workflow and explain the cause before changing code.
+@{% data variables.product.github %} Update the API in octo-org/service and its client in octo-org/web, then open linked pull requests.
+@{% data variables.product.github %} Choose a model for this conversation.
+```
+
+You need write access to every selected repository to start or steer work. Other participants in the thread can still add context. For a task moved to a Slack Code channel, continue steering it there.
+
+For more information, see [AUTOTITLE](/copilot/how-tos/copilot-integrations/integrate-cloud-agent-with-slack).
+
+## Working with issues and pull requests
+
+You can create, comment on, and manage issues and pull requests directly from Slack with or without using {% data variables.product.prodname_copilot_short %}.
+
+To have {% data variables.product.prodname_copilot_short %} perform an action, @mention the app in any chat by typing `@{% data variables.product.github %}` followed by your task.
+
+> [!NOTE]
+> {% data reusables.copilot.cloud-agent.unattributed-additional-approval-note %}
+
+For step-by-step instructions to work with issues and pull requests independent of {% data variables.product.prodname_copilot_short %}, see [AUTOTITLE](/integrations/tutorials/slack/create-issues) and [AUTOTITLE](/integrations/tutorials/slack/manage-issues).
+
+{% else %}
+
+You can create, comment on, and manage issues and pull requests directly from Slack. For step-by-step instructions, see:
+
+* [AUTOTITLE](/integrations/tutorials/slack/create-issues)
+* [AUTOTITLE](/integrations/tutorials/slack/manage-issues)
 
 {% endif %}
 
-## Mentions in Slack
+## Notification mentions in Slack
 
 When you subscribe to a repository in Slack, you will see yourself mentioned in notifications for repository events in which you have been referenced. For example, if you are assigned to an issue, or mentioned in a comment, you will see yourself mentioned in the notification in Slack.
 
@@ -65,6 +115,8 @@ The following are scenarios in which you will be mentioned:
 
 You can see a summary of your {% data variables.product.github %} mentions in the "Mentions" view in Slack. For more information, see [Triage notifications in the Activity tab](https://slack.com/help/articles/19693583638803-Triage-notifications-in-the-Activity-tab) in the Slack documentation.
 
+To learn how to customize your {% data variables.product.github %} notifications in Slack, see [AUTOTITLE](/integrations/how-tos/slack/customize-notifications).
+
 ## Threading conversations
 
 Notifications for each issue or pull request are grouped into a thread in Slack. The parent message always shows the latest status of the issue or pull request, along with other meta-data like title, description, assignees, reviewers, labels and checks. Threading helps keep conversations organized, making it easier to follow updates and discussions related to a specific issue or pull request. When the state of an issue or pull request changes, the associated reply is posted both in the thread and in the channel, so that everyone in the channel is aware of the update.
@@ -76,13 +128,19 @@ You can disable threading for issue and pull request notifications in individual
 
 You, or any other member of the channel, can re-enable threading at any time by following the same steps and clicking **Enable** in the settings menu.
 
+{% ifversion copilot %}
+
+Notification threading and {% data variables.product.prodname_copilot_short %} sessions serve different purposes. Changing notification threading settings does not change the repositories or model of an agent session. To ask for investigation or implementation, reply to a notification and mention `@{% data variables.product.github %}`.
+
+{% endif %}
+
 ## Broadcasting comments and reviews to the Slack channel
 
 By default, comments and reviews will only show up in their related thread. If you want the channel members to see them instead of just those who are participants of the issue, you can opt-in to broadcasting with the following commands:
 
-* For comment broadcasting, use `/github subscribe owner/repo comments:"channel"`
+* For comment broadcasting, use `/github subscribe OWNER/REPO comments:"CHANNEL"`
 
-* For review broadcasting, use `/github subscribe owner/repo reviews:"channel"`
+* For review broadcasting, use `/github subscribe OWNER/REPO reviews:"CHANNEL"`
 
 ## Unfurling links to {% data variables.product.github %} activities in Slack
 
@@ -112,13 +170,8 @@ You can schedule reminders for pull request reviews in Slack. Reminders can be s
 
 You can configure scheduled reminders for yourself, your team, or your entire organization. For more information, see:
 
-* [AUTOTITLE](/account-and-profile/setting-up-and-managing-your-github-user-account/managing-your-membership-in-organizations/managing-your-scheduled-reminders)
+* [AUTOTITLE](/subscriptions-and-notifications/how-tos/managing-your-scheduled-reminders)
 * [AUTOTITLE](/organizations/organizing-members-into-teams/managing-scheduled-reminders-for-your-team)
 * [AUTOTITLE](/organizations/managing-organization-settings/managing-scheduled-reminders-for-your-organization)
 
 {% endif %}
-
-## Further reading
-
-* [AUTOTITLE](/integrations/how-tos/slack/customize-notifications) - Learn how to customize your {% data variables.product.github %} notifications in Slack to meet your needs.
-* [AUTOTITLE](/integrations/tutorials/slack) - Build skills and knowledge about the {% data variables.product.github %} Slack integration through examples and hands-on activities.

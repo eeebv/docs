@@ -4,9 +4,11 @@ import type { Failbot } from '@github/failbot'
 import type enterpriseServerReleases from '@/versions/lib/enterprise-server-releases.d'
 import type { ValidOcticon } from '@/landings/types'
 import type { Language, Languages } from '@/languages/lib/languages-server'
+import type { JourneyContext } from '@/journeys/lib/journey-path-resolver'
 import type { MiniTocItem } from '@/frame/lib/get-mini-toc-items'
+import type { UIStrings } from '@/frame/components/context/MainContext'
 
-// Shared type for resolved article information used across landing pages and carousels
+// Shared by landing pages and carousels.
 export interface ResolvedArticle {
   title: string
   intro: string
@@ -14,20 +16,19 @@ export interface ResolvedArticle {
   category: string[]
 }
 
-// Throughout our codebase we "extend" the Request object by attaching
-// things to it. For example `req.context = { currentCategory: 'foo' }`.
-// This type aims to match all the custom things we do to requests
-// througout the codebase.
+// ExtendedRequest collects properties middleware attaches to Request, including req.context.
 export type ExtendedRequest = Request & {
   pagePath?: string
   context?: Context
   language?: string
   userLanguage?: string
+  userVersion?: string
   FailBot?: Failbot
 }
 
-// TODO: Make this type from inference using AJV based on the schema.
-// For now, it's based on `schema` in frame/lib/frontmatter.ts
+// Hand-maintained to match schema in frame/lib/frontmatter.ts.
+// Generating it from the AJV schema would need extra build tooling because
+// the schema is built dynamically with version-specific properties.
 export type PageFrontmatter = {
   title: string
   versions: FrontmatterVersions
@@ -40,6 +41,7 @@ export type PageFrontmatter = {
   subcategory?: boolean
   hidden?: boolean
   noEarlyAccessBanner?: boolean
+  hideSidebar?: boolean
   earlyAccessToc?: string
   layout?: string | boolean
   redirect_from?: string[]
@@ -50,14 +52,8 @@ export type PageFrontmatter = {
   effectiveDate?: string
   featuredLinks?: FeaturedLinks
   changelog?: ChangeLog
-  type?: string
   contentType?: string
-  topics?: string[]
-  includeGuides?: string[]
-  learningTracks?: string[]
   beta_product?: boolean
-  product_video?: boolean
-  product_video_transcript?: string
   interactive?: boolean
   communityRedirect?: {
     name: string
@@ -68,6 +64,7 @@ export type PageFrontmatter = {
   childGroups?: ChildGroup[]
   sidebarLink?: SidebarLink
   spotlight?: SpotlightItem[]
+  filters?: Array<'category' | 'surface' | 'complexity'>
 }
 
 type FeaturedLinks = {
@@ -76,11 +73,6 @@ type FeaturedLinks = {
   guideCards?: string[]
   popular?: string[]
   popularHeading?: string
-  videos?: {
-    title: string
-    href: string
-  }[]
-  videoHeadings?: string
 }
 
 export type ChildGroup = {
@@ -120,9 +112,10 @@ type Redirects = {
 }
 
 export type Context = {
-  // Allows dynamic properties like features & version shortnames as keys
-  [key: string]: any
+  // Context allows dynamic keys for features and version short names.
+  [key: string]: unknown
   currentCategory?: string
+  currentJourneyTrack?: JourneyContext | null
   error?: Error
   siteTree?: SiteTree
   pages?: Record<string, Page>
@@ -134,7 +127,7 @@ export type Context = {
   allVersions?: AllVersions
   currentPathWithoutLanguage?: string
   currentArticle?: string
-  query?: Record<string, any>
+  query?: Record<string, unknown>
   relativePath?: string
   page?: Page
   enPage?: Page
@@ -143,15 +136,16 @@ export type Context = {
   process?: { env: Record<string, string> }
   site?: {
     data: {
-      ui: any
+      ui: UIStrings
     }
   }
   currentVersionObj?: Version
   currentProduct?: string
   getEnglishPage?: (ctx: Context) => Page
-  getDottedData?: (dottedPath: string) => any
+  getDottedData?: (dottedPath: string) => unknown
   initialRestVersioningReleaseDate?: string
   initialRestVersioningReleaseDateLong?: string
+  defaultRestApiVersion?: string
   nonEnterpriseDefaultVersion?: string
   enterpriseServerVersions?: string[]
   enterpriseServerReleases?: typeof enterpriseServerReleases
@@ -159,7 +153,6 @@ export type Context = {
   redirectNotFound?: string
   earlyAccessPageLinks?: string
   changelogUrl?: string
-  whatsNewChangelog?: ChangelogItem[]
   secretScanningData?: SecretScanningData[]
   ghesReleases?: GHESRelease[]
   ghesReleaseNotes?: GHESReleasePatch[]
@@ -177,48 +170,15 @@ export type Context = {
   breadcrumbs?: Breadcrumb[]
   glossaries?: Glossary[]
   currentProductName?: string
-  productCommunityExamples?: ProductExample[]
-  productUserExamples?: ProductExample[]
   productGroups?: ProductGroup[]
   featuredLinks?: FeaturedLinksExpanded
-  currentLearningTrack?: LearningTrack | null
+  carousels?: Record<string, ResolvedArticle[]>
   renderedPage?: string
+  renderedPageHast?: import('hast').Root
   miniTocItems?: MiniTocItem[]
   markdownRequested?: boolean
+  markdownViaUrl?: boolean
 }
-export type LearningTracks = {
-  [group: string]: {
-    [track: string]: {
-      title: string
-      description: string
-      versions?: FrontmatterVersions
-      guides: string[]
-    }
-  }
-}
-export type LearningTrack = {
-  trackName: string
-  trackProduct: string
-  trackTitle: string
-  numberOfGuides?: number
-  currentGuideIndex?: number
-  nextGuide?: {
-    href: string
-    title: string | undefined
-  }
-  prevGuide?: {
-    href: string
-    title: string | undefined
-  }
-}
-
-export type TrackGuide = {
-  href: string
-  page: Page
-  title: string
-  intro: string
-}
-
 export type FeaturedLinkExpanded = {
   href: string
   title: string
@@ -262,6 +222,7 @@ export type ToC = {
   octicon: ValidOcticon | null
   category: string[] | null
   complexity: string[] | null
+  surface: string[] | null
   industry: string[] | null
   childTocItems: ToC[]
 }
@@ -307,12 +268,6 @@ export type ReleaseNotes = {
   }
 }
 
-export type ChangelogItem = {
-  title: string
-  date: string
-  href: string
-}
-
 export type SecretScanningData = {
   provider: string
   supportedSecret: string
@@ -322,12 +277,11 @@ export type SecretScanningData = {
   isPrivateWithGhas: boolean
   hasPushProtection: boolean
   hasValidityCheck: boolean | string
-  ismultipart?: boolean
+  hasExtendedMetadata?: boolean | string
   base64Supported: boolean
   isduplicate: boolean
 }
 
-// Language and Languages types are imported at the top from languages-server
 export type { Language, Languages }
 
 export type Permalink = {
@@ -360,8 +314,8 @@ export type Page = {
   rawPermissions?: string
   languageCode: string
   documentType: string
-  renderProp: (prop: string, context: any, opts?: any) => Promise<string>
-  renderTitle: (context: Context, opts?: any) => Promise<string>
+  renderProp: (prop: string, context: Context, opts?: Record<string, unknown>) => Promise<string>
+  renderTitle: (context: Context, opts?: Record<string, unknown>) => Promise<string>
   markdown: string
   versions: FrontmatterVersions
   applicableVersions: string[]
@@ -379,10 +333,19 @@ export type Page = {
   octicon?: string
   category?: string[]
   complexity?: string[]
+  surface?: string[]
   industry?: string[]
   sidebarLink?: SidebarLink
-  type?: string
   contentType?: string
+  docsTeamMetrics?: string[]
+  children?: string[]
+  introPlainText?: string
+  noEarlyAccessBanner?: boolean
+  hideSidebar?: boolean
+  communityRedirect?: {
+    name: string
+    href: string
+  }
 }
 
 export type SidebarLink = {
@@ -405,6 +368,7 @@ export type TitlesTree = {
   hidden?: boolean
   sidebarLink?: SidebarLink
   layout?: string
+  crossProductChild?: boolean
 }
 
 export type Tree = {
@@ -412,6 +376,7 @@ export type Tree = {
   children: string[] | undefined
   href: string
   childPages: Tree[]
+  crossProductChild?: boolean
 }
 export type VersionedTree = {
   [version: string]: Tree
@@ -425,6 +390,7 @@ export type UnversionedTree = {
   page: Page
   children: string[]
   childPages: UnversionedTree[]
+  crossProductChild?: boolean
 }
 
 export type UnversionLanguageTree = {
@@ -464,17 +430,9 @@ export type AllVersions = {
   [name: string]: Version
 }
 
-// Use this when constructing a URLSearchParams object from a `req.query`.
-// E.g. `const sp = new URLSearchParams(req.query as URLSearchParamsTypes)`
-// It's useful because otherwise you might get a TypeScript error that
-// is not possible to happen at runtime.
+// Cast req.query to this type when building URLSearchParams.
+// TypeScript rejects values that are safe at runtime.
 export type URLSearchParamsTypes = string | string[][] | Record<string, string> | URLSearchParams
-
-export type ProductExample = {
-  repo?: string
-  user?: string
-  description: string
-}
 
 export type FeatureData = {
   [key: string]: Versions
@@ -483,8 +441,7 @@ export type Versions = {
   versions: FrontmatterVersions
 }
 
-// Used for parsing .md pages with YAML frontmatter
-// This is not the full list available in the frontmatter schema
+// Fields parsed from .md frontmatter; the full schema allows more fields.
 export type MarkdownFrontmatter = {
   title: string
   shortTitle?: string
@@ -493,6 +450,5 @@ export type MarkdownFrontmatter = {
   versions: FrontmatterVersions
   subcategory?: boolean
   hidden?: boolean
-  type?: string
   contentType?: string
 }

@@ -3,11 +3,13 @@ import path from 'path'
 
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest'
 import nock from 'nock'
+import type { Request, Response } from 'express'
 
 import { get } from '@/tests/helpers/e2etest'
 import { checkCachingHeaders } from '@/tests/helpers/caching-headers'
 import { setDefaultFastlySurrogateKey } from '@/frame/middleware/set-fastly-surrogate-key'
 import archivedEnterpriseVersionsAssets from '@/archives/middleware/archived-enterprise-versions-assets'
+import type { ExtendedRequest } from '@/types'
 
 function getNextStaticAsset(directory: string) {
   const root = path.join('.next', 'static', directory)
@@ -30,14 +32,14 @@ function mockRequest(requestPath: string, { headers }: { headers?: Record<string
       _headers[header.toLowerCase()] = value
     },
     headers,
-  }
+  } as unknown as Request & ExtendedRequest
 }
 
 type MockResponse = {
-  status: number
-  statusCode: number
-  json?: (payload: any) => void
-  send?: (body: any) => void
+  status: number | undefined
+  statusCode: number | undefined
+  json?: (payload: unknown) => void
+  send?: (body: unknown) => void
   sendStatus?: (statusCode: number) => void
   end?: () => void
   _json?: string
@@ -50,25 +52,24 @@ type MockResponse = {
 
 const mockResponse = () => {
   const res: MockResponse = {
-    status: undefined as any,
-    statusCode: undefined as any,
+    status: undefined,
+    statusCode: undefined,
     headers: {},
   }
   res.json = (payload) => {
-    res._json = payload
+    res._json = payload as string
   }
   res.send = (body) => {
     res.status = 200
     res.statusCode = 200
-    res._send = body
+    res._send = body as string
   }
   res.end = () => {
-    // Mock end method
+    // Express responses expose end even when tests do not need behavior.
   }
   res.sendStatus = (statusCode) => {
     res.status = statusCode
     res.statusCode = statusCode
-    // Mock sendStatus method
   }
   res.set = (key, value) => {
     if (typeof key === 'string') {
@@ -85,13 +86,12 @@ const mockResponse = () => {
   res.hasHeader = (key) => {
     return key in res.headers
   }
-  // Add Express-style status method that supports chaining
-  ;(res as any).status = (code: number) => {
+  ;(res as unknown as { status: (code: number) => MockResponse }).status = (code: number) => {
     res.status = code
     res.statusCode = code
     return res
   }
-  return res
+  return res as unknown as Response & MockResponse
 }
 
 describe('static assets', () => {
@@ -110,8 +110,7 @@ describe('static assets', () => {
   })
 
   test('should serve /_next/static/ with optimal headers', async () => {
-    // This picks the first one found. We just need it to be anything
-    // that actually resolves.
+    // Any built CSS file proves _next static assets get optimal headers.
     const filePath = getNextStaticAsset('css')
     const asURL = `/${filePath.replace('.next', '_next').split(path.sep).join('/')}`
     const res = await get(asURL)
@@ -123,7 +122,7 @@ describe('static assets', () => {
     const res = await get('/assets/cb-1234/never/heard/of.png')
     expect(res.statusCode).toBe(404)
     expect(res.headers['content-type']).toContain('text/plain')
-    // Only a tiny amount of Cache-Control on these
+    // Missing assets get a short Cache-Control lifetime.
     checkCachingHeaders(res, true, 60)
   })
   test('should 404 on /assets/ with plain text', async () => {
@@ -161,17 +160,11 @@ describe('static assets', () => {
 })
 
 describe('archived enterprise static assets', () => {
-  // Sometimes static assets are proxied. The URL for the static asset
-  // might not indicate it's based on archived enterprise version.
+  // Archived enterprise assets can require proxying even when the URL lacks an enterprise prefix.
 
   vi.setConfig({ testTimeout: 60 * 1000 })
 
   beforeAll(async () => {
-    // The first page load takes a long time so let's get it out of the way in
-    // advance to call out that problem specifically rather than misleadingly
-    // attributing it to the first test
-    // await get('/')
-
     const sampleCSS = '/* nice CSS */'
 
     nock('https://github.github.com')
@@ -222,7 +215,7 @@ describe('archived enterprise static assets', () => {
       throw new Error('did not expect this to ever happen')
     }
     setDefaultFastlySurrogateKey(req, res, () => {})
-    await archivedEnterpriseVersionsAssets(req as any, res as any, next)
+    await archivedEnterpriseVersionsAssets(req, res, next)
     expect(res.statusCode).toBe(200)
     checkCachingHeaders(res, false, 60)
   })
@@ -238,7 +231,7 @@ describe('archived enterprise static assets', () => {
       throw new Error('did not expect this to ever happen')
     }
     setDefaultFastlySurrogateKey(req, res, () => {})
-    await archivedEnterpriseVersionsAssets(req as any, res as any, next)
+    await archivedEnterpriseVersionsAssets(req, res, next)
     expect(res.statusCode).toBe(200)
     checkCachingHeaders(res, false, 60)
   })
@@ -254,7 +247,7 @@ describe('archived enterprise static assets', () => {
       throw new Error('did not expect this to ever happen')
     }
     setDefaultFastlySurrogateKey(req, res, () => {})
-    await archivedEnterpriseVersionsAssets(req as any, res as any, next)
+    await archivedEnterpriseVersionsAssets(req, res, next)
     expect(res.statusCode).toBe(200)
     checkCachingHeaders(res, false, 60)
   })
@@ -271,9 +264,8 @@ describe('archived enterprise static assets', () => {
       nexted = true
     }
     setDefaultFastlySurrogateKey(req, res, next)
-    await archivedEnterpriseVersionsAssets(req as any, res as any, next)
-    // It didn't exit in that middleware but called next() to move on
-    // with any other middlewares.
+    await archivedEnterpriseVersionsAssets(req, res, next)
+    // The proxy 404 falls through to later middleware.
     expect(nexted).toBe(true)
   })
 
@@ -289,9 +281,8 @@ describe('archived enterprise static assets', () => {
       nexted = true
     }
     setDefaultFastlySurrogateKey(req, res, () => {})
-    await archivedEnterpriseVersionsAssets(req as any, res as any, next)
-    // It tried to go via the proxy, but it wasn't there, but then it
-    // tried "our disk" and it's eventually there.
+    await archivedEnterpriseVersionsAssets(req, res, next)
+    // When the proxy misses, later middleware can still serve the local asset.
     expect(nexted).toBe(true)
   })
 
@@ -335,7 +326,7 @@ describe('archived enterprise static assets', () => {
           nexted = true
         }
         setDefaultFastlySurrogateKey(req, res, () => {})
-        await archivedEnterpriseVersionsAssets(req as any, res as any, next)
+        await archivedEnterpriseVersionsAssets(req, res, next)
         expect(res.statusCode).toBe(expectStatus)
         if (shouldCallNext) {
           expect(nexted).toBe(true)
@@ -374,7 +365,7 @@ describe('archived enterprise static assets', () => {
           nexted = true
         }
         setDefaultFastlySurrogateKey(req, res, () => {})
-        await archivedEnterpriseVersionsAssets(req as any, res as any, next)
+        await archivedEnterpriseVersionsAssets(req, res, next)
         expect(nexted).toBe(shouldCallNext)
         expect(res.statusCode).toBe(expectStatus)
       })

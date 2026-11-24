@@ -2,13 +2,11 @@
 title: GitHub Terms
 versions:
   fpt: '*'
-topics:
-  - Policy
-  - Legal
 children:
   - /github-terms-of-service
   - /github-corporate-terms-of-service
   - /github-terms-for-additional-products-and-features
+  - /github-partner-success-offering-terms
   - /github-community-guidelines
   - /github-community-code-of-conduct
   - /github-pre-release-license-terms
@@ -23,4 +21,5 @@ children:
   - /github-event-code-of-conduct
   - /github-educational-use-agreement
   - /github-copilot-extension-developer-policy
+  - /github-secret-scanning-partner-program-agreement
 ---

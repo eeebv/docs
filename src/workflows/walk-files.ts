@@ -1,16 +1,10 @@
-// [start-readme]
-//
-// A helper that returns an array of files for a given path and file extension.
-//
-// [end-readme]
-
 import walk from 'walk-sync'
 import fs from 'fs'
 
 export default function walkFiles(
   dir: string,
   ext: string | string[],
-  opts: Record<string, any> = {},
+  opts: Record<string, unknown> = {},
 ) {
   const extensions = Array.isArray(ext) ? ext : [ext]
   const walkSyncOpts = { includeBasePath: true, directories: false }

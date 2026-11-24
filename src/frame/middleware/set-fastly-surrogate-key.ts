@@ -1,23 +1,21 @@
-import type { NextFunction } from 'express'
+import type { Request, Response, NextFunction } from 'express'
 
-// Fastly provides a Soft Purge feature that allows you to mark content as outdated (stale) instead of permanently
-// purging and thereby deleting it from Fastly's caches. Objects invalidated with Soft Purge will be treated as
-// outdated (stale) while Fastly fetches a new version from origin.
-//
-// Use of a surrogate key is required for soft purging
+import { ExtendedRequest } from '@/types'
+import type { Page, Version } from '@/types'
+
+// Fastly soft purges mark cached objects stale while origin fetches a fresh copy.
+// Soft purges require surrogate keys.
 // https://docs.fastly.com/en/guides/soft-purges
 // https://docs.fastly.com/en/guides/getting-started-with-surrogate-keys
 
-// What the header needs to be called for Fastly to recognize it.
+// Fastly reads surrogate keys from this response header.
 const KEY = 'surrogate-key'
 
 export const SURROGATE_ENUMS = {
-  DEFAULT: 'every-deployment',
   MANUAL: 'manual-purge',
 }
 
-// Using 'any' type for res parameter to maintain compatibility with Express Response objects
-export function setFastlySurrogateKey(res: any, enumKey: string, isCustomKey = false) {
+export function setFastlySurrogateKey(res: Response, enumKey: string, isCustomKey = false) {
   if (process.env.NODE_ENV !== 'production') {
     if (!isCustomKey && !Object.values(SURROGATE_ENUMS).includes(enumKey)) {
       throw new Error(
@@ -30,17 +28,24 @@ export function setFastlySurrogateKey(res: any, enumKey: string, isCustomKey = f
   res.set(KEY, enumKey)
 }
 
-// Using 'any' type for req and res parameters to maintain backward compatibility with test mock objects
-// that don't fully implement ExtendedRequest and Response interfaces
-export function setDefaultFastlySurrogateKey(req: any, res: any, next: NextFunction) {
-  res.set(KEY, `${SURROGATE_ENUMS.DEFAULT} ${makeLanguageSurrogateKey()}`)
+export function setDefaultFastlySurrogateKey(req: Request, res: Response, next: NextFunction) {
+  res.set(KEY, makeLanguageSurrogateKey())
   return next()
 }
 
-// Using 'any' type for req and res parameters to maintain backward compatibility with test mock objects
-// that don't fully implement ExtendedRequest and Response interfaces
-export function setLanguageFastlySurrogateKey(req: any, res: any, next: NextFunction) {
-  res.set(KEY, `${SURROGATE_ENUMS.DEFAULT} ${makeLanguageSurrogateKey(req.language)}`)
+export function setLanguageFastlySurrogateKey(
+  req: ExtendedRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  const context = req.context
+  const keys = makeContentSurrogateKeys({
+    langCode: req.language,
+    productId: productSurrogateId(context?.page),
+    versionKey: versionSurrogateKey(context?.currentVersionObj),
+    relativePath: context?.page?.relativePath,
+  })
+  res.set(KEY, keys.join(' '))
   return next()
 }
 
@@ -49,4 +54,71 @@ export function makeLanguageSurrogateKey(langCode?: string) {
     return 'no-language'
   }
   return `language:${langCode}`
+}
+
+// Content responses get about five keys, one per purge axis,
+// below Fastly's 16 KB header limit.
+// Shapes include language:<code>, product:<top-level-dir>, version:<short-release-slug>,
+// product:<product>,language:<code>, and language:<code>,path:<source-path>.
+// language:<code> also appears on non-content responses.
+// product:<product>,language:<code> targets translation purges.
+// language:<code>,path:<source-path> covers one source page across all versions.
+// Each response emits at most one product key and at most one version key.
+export function makeContentSurrogateKeys({
+  langCode,
+  productId,
+  versionKey,
+  relativePath,
+}: {
+  langCode?: string
+  productId?: string
+  versionKey?: string
+  relativePath?: string
+}): string[] {
+  const keys = [makeLanguageSurrogateKey(langCode)]
+  if (productId) {
+    keys.push(`product:${productId}`)
+    if (langCode) {
+      keys.push(`product:${productId},language:${langCode}`)
+    }
+  }
+  if (versionKey) {
+    keys.push(`version:${versionKey}`)
+  }
+  const pageKey = makePageSurrogateKey(langCode, relativePath)
+  if (pageKey) {
+    keys.push(pageKey)
+  }
+  return keys
+}
+
+// Page surrogate keys cover every version URL for one source page.
+// Example: language:en,path:actions/foo.md.
+// The purge job rebuilds them from changed file paths.
+// Language scoping avoids evicting translations on English deploys.
+// Missing language or path returns undefined for non-content responses.
+export function makePageSurrogateKey(langCode?: string, relativePath?: string): string | undefined {
+  if (!langCode || !relativePath) return undefined
+  return `language:${langCode},path:${relativePath}`
+}
+
+// Product surrogate keys use the top-level content directory, mirroring Page.parentProductId.
+// Example: actions.
+// Non-content responses and the top-level homepage return undefined.
+function productSurrogateId(page?: Page): string | undefined {
+  const relativePath = page?.relativePath
+  if (!relativePath) return undefined
+  const id = relativePath.split('/')[0]
+  if (!id || id.endsWith('.md')) return undefined
+  return id
+}
+
+// Version surrogate keys use the short name.
+// Numbered GitHub Enterprise Server releases append currentRelease for single-release purges.
+// Unnumbered plans use the short name alone.
+function versionSurrogateKey(versionObj?: Version): string | undefined {
+  if (!versionObj) return undefined
+  return versionObj.hasNumberedReleases
+    ? `${versionObj.shortName}-${versionObj.currentRelease}`
+    : versionObj.shortName
 }

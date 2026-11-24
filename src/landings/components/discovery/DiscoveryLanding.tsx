@@ -1,35 +1,63 @@
+import { useRouter } from 'next/router'
+
 import { DefaultLayout } from '@/frame/components/DefaultLayout'
 import { useLandingContext } from '@/landings/context/LandingContext'
 import { LandingHero } from '@/landings/components/shared/LandingHero'
 import { ArticleGrid } from '@/landings/components/shared/LandingArticleGridWithFilter'
 import { LandingCarousel } from '@/landings/components/shared/LandingCarousel'
+import { LandingSection } from '@/landings/components/shared/LandingSection'
 import { UtmPreserver } from '@/frame/components/UtmPreserver'
+import { RestRedirect } from '@/rest/components/RestRedirect'
+import { useMultiQueryParams } from '@/search/components/hooks/useMultiQueryParams'
 
 export const DiscoveryLanding = () => {
+  const router = useRouter()
   const {
     title,
     intro,
     heroImage,
+    heroImageDark,
     introLinks,
     tocItems,
-    recommended,
+    carousels,
     includedCategories,
+    keepArticleOrder,
     landingType,
   } = useLandingContext()
+  const { params, updateParams } = useMultiQueryParams({
+    useHistory: true,
+    excludeFromHistory: ['articles-filter'],
+  })
 
   return (
     <DefaultLayout>
       <UtmPreserver />
-      <div>
-        <LandingHero title={title} intro={intro} heroImage={heroImage} introLinks={introLinks} />
-        <div className="container-xl px-3 px-md-6 mt-6 mb-4">
-          <LandingCarousel recommended={recommended} />
+      {router.query.productId === 'rest' && <RestRedirect />}
+      <div data-search="article-body">
+        <LandingHero
+          title={title}
+          intro={intro}
+          heroImage={heroImage}
+          heroImageDark={heroImageDark}
+          introLinks={introLinks}
+        />
+        {carousels &&
+          Object.entries(carousels).map(([carouselKey, articles]) => (
+            <LandingSection key={carouselKey}>
+              <LandingCarousel carouselKey={carouselKey} carouselArticles={articles} />
+            </LandingSection>
+          ))}
+
+        <LandingSection>
           <ArticleGrid
             tocItems={tocItems}
             includedCategories={includedCategories}
+            keepArticleOrder={keepArticleOrder}
             landingType={landingType}
+            params={params}
+            updateParams={updateParams}
           />
-        </div>
+        </LandingSection>
       </div>
     </DefaultLayout>
   )

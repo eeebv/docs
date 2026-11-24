@@ -1,14 +1,9 @@
-// [start-readme]
-//
-// Run this script to check if OpenAPI files can be decorated successfully.
-//
-// [end-readme]
+// Verifies that OpenAPI files can be decorated successfully.
 
 import fs from 'fs'
 import path from 'path'
-import { globSync } from 'glob'
 import { program } from 'commander'
-import { createOperations, processOperations } from './utils/get-operations'
+import { createOperations, processOperations, type SchemaInput } from './utils/get-operations'
 
 interface ProgramOptions {
   files: string[]
@@ -24,7 +19,7 @@ program
 
 const filenames: string[] = (program.opts() as ProgramOptions).files
 
-const filesToCheck: string[] = filenames.flatMap((filename: string) => globSync(filename))
+const filesToCheck: string[] = filenames.flatMap((filename: string) => fs.globSync(filename))
 
 if (filesToCheck.length) {
   check(filesToCheck)
@@ -35,23 +30,21 @@ if (filesToCheck.length) {
 
 async function check(files: string[]): Promise<void> {
   console.log('Verifying OpenAPI files are valid with decorator')
-  const documents: [string, any][] = files.map((filename: string) => [
+  const documents: [string, unknown][] = files.map((filename: string) => [
     filename,
     JSON.parse(fs.readFileSync(path.join(filename), 'utf8')),
   ])
 
-  for (const [filename, schema] of documents as [string, any][]) {
+  for (const [filename, schema] of documents as [string, unknown][]) {
     try {
-      // munge OpenAPI definitions object in an array of operations objects
-      const operations = await createOperations(schema)
-      // process each operation, asynchronously rendering markdown and stuff
+      const operations = await createOperations(schema as SchemaInput)
       await processOperations(operations, {})
 
       console.log(`Successfully could decorate OpenAPI operations for document ${filename}`)
     } catch (error: unknown) {
       console.error(error)
       console.log(
-        `🐛 Whoops! It looks like the decorator script wasn't able to parse the dereferenced schema in file ${filename}. A recent change may not yet be supported by the decorator. Please reach out in the #docs-engineering slack channel for help.`,
+        `🐛 Whoops! It looks like the decorator script wasn't able to parse the dereferenced schema in file ${filename}. A recent change may not yet be supported by the decorator. Please reach out in the #technical-content slack channel for help.`,
       )
       process.exit(1)
     }

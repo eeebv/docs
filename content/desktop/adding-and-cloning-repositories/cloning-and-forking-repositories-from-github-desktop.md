@@ -11,6 +11,8 @@ versions:
   ghec: '*'
   ghes: '*'
 shortTitle: Clone & fork from Desktop
+category:
+  - Add and clone repositories
 ---
 ## About local repositories
 
@@ -18,11 +20,13 @@ Repositories on {% data variables.product.github %} are remote repositories. You
 
 You can create a local copy of any repository on {% data variables.product.github %} that you have access to by cloning the repository. If you own a repository or have write permissions, you can sync between the local and remote locations. For more information, see [AUTOTITLE](/desktop/working-with-your-remote-repository-on-github-or-github-enterprise/syncing-your-branch-in-github-desktop).
 
-When you clone a repository, any changes you push to {% data variables.product.github %} will affect the original repository. To make changes without affecting the original project, you can create a separate copy by forking the repository. You can create a pull request to propose that maintainers incorporate the changes in your fork into the original upstream repository. For more information, see [AUTOTITLE](/pull-requests/collaborating-with-pull-requests/working-with-forks/about-forks).
+When you clone a repository, any changes you push to {% data variables.product.github %} will affect the original repository. To make changes without affecting the original project, you can create a separate copy by forking the repository. You can create a pull request to propose that maintainers incorporate the changes in your fork into the original upstream repository. For more information, see [AUTOTITLE](/pull-requests/reference/forks).
 
 When you use {% data variables.product.prodname_desktop %} to push a change to a repository that you do not have write access to, {% data variables.product.prodname_desktop %} will prompt you to create a fork. You can choose to use your fork to contribute to the original upstream repository or to work independently on your own project. Any existing forks default to contributing changes to their upstream repositories. You can modify this choice at any time. For more information, see [Managing fork behavior](#managing-fork-behavior).
 
 You can also clone a repository directly from {% data variables.product.prodname_dotcom %} or {% data variables.product.prodname_enterprise %}. For more information, see [AUTOTITLE](/desktop/adding-and-cloning-repositories/cloning-a-repository-from-github-to-github-desktop).
+
+If you're signed in to more than one account, {% data variables.product.prodname_desktop %} assigns each cloned repository to one of your accounts. For more information, see [AUTOTITLE](/desktop/installing-and-authenticating-to-github-desktop/using-multiple-accounts-in-github-desktop).
 
 ## Cloning a repository
 
@@ -34,7 +38,7 @@ You can also clone a repository directly from {% data variables.product.prodname
 
 ## Forking a repository
 
-You can fork a repository on {% data variables.product.github %} or in {% data variables.product.prodname_desktop %}. For information about forking on {% data variables.product.github %}, see [AUTOTITLE](/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo?tool=webui).
+You can fork a repository on {% data variables.product.github %} or in {% data variables.product.prodname_desktop %}. For information about forking on {% data variables.product.github %}, see [AUTOTITLE](/pull-requests/how-tos/work-with-forks/fork-a-repo?tool=webui).
 
 {% data reusables.desktop.forking-a-repo %}
 

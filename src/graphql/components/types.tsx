@@ -27,7 +27,6 @@ export type UpcomingChangesT = {
 
 export type GraphqlT = {
   name: string
-  kind: string
   id: string
   href: string
   description: string
@@ -36,7 +35,7 @@ export type GraphqlT = {
   isDeprecated?: boolean
   deprecationReason?: string
   preview?: PreviewT
-  defaultValue?: boolean
+  defaultValue?: string | boolean
 }
 
 export type ImplementsT = {
@@ -52,7 +51,6 @@ export type ArgumentT = {
   type: {
     name: string
     id: string
-    kind: string
     href: string
   }
 }
@@ -79,9 +77,15 @@ export type InterfaceT = GraphqlT & {
   fields: FieldT[]
 }
 
+export type InterfaceImplementerT = Pick<ObjectT, 'name' | 'href'> & {
+  implements?: Pick<ImplementsT, 'name'>[]
+}
+
 export type EnumValuesT = {
   name: string
   description: string
+  isDeprecated?: boolean
+  deprecationReason?: string
 }
 
 export type EnumT = GraphqlT & {
@@ -100,9 +104,7 @@ export type InputObjectT = GraphqlT & {
   inputFields: FieldT[]
 }
 
-export type ScalarT = GraphqlT & {
-  kind?: string
-}
+export type ScalarT = GraphqlT
 
 export type AllVersionsT = {
   [versions: string]: {

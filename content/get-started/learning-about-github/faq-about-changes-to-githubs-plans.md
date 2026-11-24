@@ -1,15 +1,15 @@
 ---
-title: FAQ about changes to GitHub’s plans
+title: FAQ about changes to GitHub's plans
 intro: 'As of April 14, 2020, GitHub announced that all of the core GitHub features are now free for everyone.'
 versions:
   fpt: '*'
   ghec: '*'
-topics:
-  - GitHub
 redirect_from:
   - /github/getting-started-with-github/faq-about-changes-to-githubs-plans
   - /github/getting-started-with-github/learning-about-github/faq-about-changes-to-githubs-plans
 shortTitle: Changes to GitHub plans
+category:
+  - Explore GitHub plans and features
 ---
 ## What plans and pricing changes did GitHub announce on April 14?
 
@@ -27,11 +27,11 @@ GitHub announced the following plans and pricing changes:
 
 ## How can I upgrade my plan?
 
-To upgrade your account's plan, see [AUTOTITLE](/billing/managing-the-plan-for-your-github-account/upgrading-your-accounts-plan).
+To upgrade your account's plan, see [AUTOTITLE](/billing/how-tos/manage-plan-and-licenses/upgrade-plan).
 
 ## How can I downgrade my plan?
 
-To downgrade your personal account or organizations's plan, see [AUTOTITLE](/billing/managing-the-plan-for-your-github-account/downgrading-your-accounts-plan).
+To downgrade your personal account or organization's plan, see [AUTOTITLE](/billing/how-tos/manage-plan-and-licenses/downgrade-plan).
 
 ## If I downgrade from GitHub Team or a Legacy plan to GitHub Free, what features will I lose?
 
@@ -65,17 +65,17 @@ Customers who are currently paying annually for Pro and Team plans and signed up
 
 For details on the differences for each GitHub Free product, see [AUTOTITLE](/get-started/learning-about-github/githubs-plans).
 
-## How can I get more Actions minutes if I need more than allocated in the GitHub Team plan?
+## What happens if I consume the included compute usage for the GitHub Team plan?
 
-Most small teams use fewer than 3,000 Actions minutes/month, but some teams might use more. If your team needs additional minutes for private repositories, you can increase your spending limit for GitHub Actions. Actions minutes and Packages storage are still free for your public repositories. For more information, see [AUTOTITLE](/billing/managing-billing-for-github-actions/managing-your-spending-limit-for-github-actions).
+If your team consumes its included compute usage, additional eligible usage is billed at the applicable rate. You can use budgets to monitor or limit additional spending. Standard {% data variables.product.github %}-hosted runner usage remains free for public repositories, independently of the included value. For more information, see [AUTOTITLE](/billing/concepts/product-billing/github-actions) and [AUTOTITLE](/billing/how-tos/set-up-budgets).
 
 ## How do the seat limit changes affect me?
 
-Now that {% data variables.product.prodname_team %} has no minimum seat requirement, if you are using fewer than five seats in your organization, you can remove paid seats to reduce your bill. For more information, see [AUTOTITLE](/billing/managing-the-plan-for-your-github-account/downgrading-your-accounts-plan#removing-paid-seats-from-your-organization).
+Now that {% data variables.product.prodname_team %} has no minimum seat requirement, if you are using fewer than five seats in your organization, you can remove paid seats to reduce your bill. For more information, see [AUTOTITLE](/billing/how-tos/manage-plan-and-licenses/downgrade-plan).
 
 ## Is anything changing for teams on the GitHub Team for Open Source plan?
 
-If your organization account currently uses the GitHub Team for Open Source plan, you’ve been automatically moved to GitHub Free, which includes private repositories with unlimited collaborators, 2,000 Actions minutes for private repositories, and GitHub Community on Discussions. Actions minutes and Packages storage are still free for your public repositories.
+If your organization account currently uses the GitHub Team for Open Source plan, you’ve been automatically moved to GitHub Free, which includes private repositories with unlimited collaborators, 2,000 Actions minutes for private repositories, and GitHub Community on Discussions. Standard {% data variables.product.github %}-hosted runner usage and Packages storage are still free for your public repositories.
 
 ## What is GitHub Community on Discussions?
 

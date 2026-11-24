@@ -4,23 +4,14 @@ shortTitle: Concepts
 intro: Learn the core concepts that you'll need to understand {% data variables.product.prodname_copilot %}.
 versions:
   feature: copilot
-topics:
-  - Copilot
 children:
-  - /completions
-  - /chat
-  - /agents
-  - /spark
-  - /prompting
-  - /context
-  - /tools
-  - /auto-model-selection
-  - /rate-limits
-  - /billing
-  - /about-enterprise-accounts-for-copilot-business
-  - /policies
-  - /mcp-management
-  - /network-settings
-  - /copilot-metrics
+  - /copilot-surfaces
+  - /agent-capabilities
+  - /prompting-and-context
+  - /customizations
+  - /models
+  - /billing-and-usage
+  - /security-governance-and-network-settings
+  - /enterprise
 contentType: concepts
 ---

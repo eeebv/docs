@@ -6,11 +6,15 @@ redirect_from:
   - /articles/organizing-information-with-tables
   - /github/writing-on-github/organizing-information-with-tables
   - /github/writing-on-github/working-with-advanced-formatting/organizing-information-with-tables
+  - /copilot/tutorials/copilot-cookbook/communicate-effectively/generating-tables
+  - /copilot/tutorials/copilot-chat-cookbook/communicate-effectively/generating-tables
 versions:
   fpt: '*'
   ghes: '*'
   ghec: '*'
 shortTitle: Organized data with tables
+category:
+  - Write and format content
 ---
 ## Creating a table
 

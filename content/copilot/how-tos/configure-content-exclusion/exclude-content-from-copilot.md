@@ -21,24 +21,19 @@ redirect_from:
   - /copilot/managing-copilot/configuring-and-auditing-content-exclusion/excluding-content-from-github-copilot
   - /copilot/how-tos/content-exclusion/excluding-content-from-github-copilot
   - /copilot/how-tos/content-exclusion/exclude-content-from-copilot
-topics:
-  - Copilot
 contentType: how-tos
-category: 
+category:
   - Configure Copilot
 ---
 
+{% data reusables.copilot.content-exclusion-intro %} For more information and a list of supported clients, see [AUTOTITLE](/copilot/concepts/security-governance-and-network-settings/content-exclusion).
+
 ## Configuring content exclusion for your repository
-
-You can use your repository settings to specify content in your repository that {% data variables.product.prodname_copilot %} should ignore.
-
-> [!NOTE]
-> {% data variables.copilot.copilot_cli %}, {% data variables.copilot.copilot_coding_agent %}, and Agent mode in {% data variables.copilot.copilot_chat_short %} in IDEs, do not support content exclusion. For more information, see [AUTOTITLE](/copilot/concepts/agents/coding-agent/about-coding-agent) and [AUTOTITLE](/copilot/how-tos/chat-with-copilot/chat-in-ide).
 
 {% data reusables.repositories.navigate-to-repo %}
 {% data reusables.repositories.sidebar-settings %}
 
-1. In the "Code & automation" section of the sidebar, click **{% octicon "copilot" aria-hidden="true" aria-label="copilot" %} {% data variables.product.prodname_copilot_short %}** then click **Content exclusion**.
+1. {% data reusables.user-settings.code-planning-automation %} click **{% octicon "copilot" aria-hidden="true" aria-label="copilot" %} {% data variables.product.prodname_copilot_short %}** then click **Content exclusion**.
 
    If your repository inherits any exclusions from its parent organization, or from organizations in the same enterprise, you'll see one or more gray boxes at the top of the page, containing details of these exclusions. You cannot edit these settings.
 
@@ -163,6 +158,10 @@ As an enterprise owner, you can use the enterprise settings to specify files tha
 > [!NOTE]
 > The key difference between setting content exclusion at the enterprise level and the organization level is that rules set at the enterprise level apply to all {% data variables.product.prodname_copilot_short %} users in the enterprise, whereas the rules set by organization owners only apply to users who are assigned a {% data variables.product.prodname_copilot_short %} seat by that organization.
 
+## Limitations of content exclusion with {% data variables.copilot.copilot_agents_short %}
+
+{% data reusables.copilot.content-exclusion-agent-limitations %}
+
 ## Testing changes to content exclusions
 
 You can use your IDE to confirm that your changes to content exclusions are working as expected.
@@ -194,8 +193,15 @@ You can verify that content exclusions you have configured are working as expect
 
      If the file is excluded, {% data variables.copilot.copilot_chat_short %} will not be able to use the file to generate a response. The file will not be listed as a reference in {% data variables.product.prodname_copilot_short %}'s response.
 
+## Manage content exclusions with the REST API
+
+Organization owners and enterprise owners can also manage content exclusions programmatically using the {% data variables.product.github %} REST API.
+
+For more information, see [AUTOTITLE](/rest/copilot/copilot-content-exclusion-management).
+
 ## Further reading
 
-* [AUTOTITLE](/copilot/concepts/content-exclusion-for-github-copilot)
-* [AUTOTITLE](/copilot/managing-copilot/managing-github-copilot-in-your-organization/managing-access-to-github-copilot-in-your-organization/reviewing-changes-to-content-exclusions-for-github-copilot)
+* [AUTOTITLE](/copilot/concepts/context/content-exclusion)
+* [AUTOTITLE](/copilot/how-tos/configure-content-exclusion/review-changes)
 * [Configuring content exclusion for {% data variables.product.prodname_vs %}](https://learn.microsoft.com/en-us/visualstudio/ide/visual-studio-github-copilot-admin?view=vs-2022#configure-content-exclusion) in the Microsoft Learn documentation
+* [AUTOTITLE](/copilot/reference/supported-surfaces-for-policies)

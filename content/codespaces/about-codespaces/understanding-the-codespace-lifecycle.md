@@ -1,19 +1,18 @@
 ---
 title: Understanding the codespace lifecycle
 shortTitle: The codespace lifecycle
-intro: 'Learn how to develop in a {% data variables.product.prodname_github_codespaces %} environment, and maintain your data throughout the entire codespace lifecycle.'
+intro: Learn how to develop in a {% data variables.product.prodname_github_codespaces %} environment, and maintain your data throughout the entire codespace lifecycle.
 versions:
   fpt: '*'
   ghec: '*'
-type: overview
-topics:
-  - Codespaces
-  - Developer
 redirect_from:
   - /codespaces/developing-in-codespaces/codespaces-lifecycle
   - /codespaces/developing-in-codespaces/the-codespace-lifecycle
   - /codespaces/about-codespaces/the-codespace-lifecycle
   - /codespaces/getting-started/understanding-the-codespace-lifecycle
+contentType: concepts
+category:
+  - Get started
 ---
 
 > [!NOTE]
@@ -41,9 +40,19 @@ Your work will be saved on a virtual machine in the cloud. You can close and sto
 
 ## Timeouts for {% data variables.product.prodname_github_codespaces %}
 
-If you leave your codespace running without interaction, or if you exit your codespace without explicitly stopping it, the codespace will timeout after a period of inactivity and stop running. By default, a codespace will timeout after 30 minutes of inactivity, but you can customize the duration of the timeout period for new codespaces that you create. For more information about setting the default timeout period for your codespaces, see [AUTOTITLE](/codespaces/setting-your-user-preferences/setting-your-timeout-period-for-github-codespaces). For more information about stopping a codespace, see [Stopping a codespace](#stopping-a-codespace).
+If you leave your codespace running without interaction, or if you exit your codespace without explicitly stopping it, the codespace will time out after a period of inactivity and stop running. By default, a codespace will time out after 30 minutes of inactivity, but you can customize the duration of the timeout period for new codespaces that you create. For more information about setting the default timeout period for your codespaces, see [AUTOTITLE](/codespaces/setting-your-user-preferences/setting-your-timeout-period-for-github-codespaces). For more information about stopping a codespace, see [Stopping a codespace](#stopping-a-codespace).
 
 When a codespace times out, your data is preserved from the last time your changes were saved. For more information, see [Saving changes in a codespace](#saving-changes-in-a-codespace).
+
+## Maximum lifetime of a codespace
+
+A codespace has a maximum lifetime of 12 hours, regardless of your idle timeout policy or settings. This limit applies even while you are actively using the codespace.
+
+As a codespace approaches this 12-hour limit, you will see the following warning:
+
+> Your codespace must be stopped soon. Stop and then reconnect to your codespace to keep working.
+
+Your data is saved, then the codespace automatically stops. To continue working, restart the codespace. For more information, see [AUTOTITLE](/codespaces/developing-in-a-codespace/stopping-and-starting-a-codespace#restarting-a-codespace).
 
 ## Rebuilding a codespace
 
@@ -65,7 +74,7 @@ If you try to delete a codespace with unpushed git commits, your editor will not
 
 Codespaces that have been stopped and remain inactive for a specified period of time will be deleted automatically. By default, inactive codespaces are deleted after 30 days, but you can customize your codespace retention period. For more information, see [AUTOTITLE](/codespaces/setting-your-user-preferences/configuring-automatic-deletion-of-your-codespaces).
 
-If you create a codespace, it will continue to accrue storage charges until it is deleted, irrespective of whether it is active or stopped. For more information, see [AUTOTITLE](/billing/concepts/product-billing/github-codespaces). Deleting a codespace does not reduce the current billable amount for {% data variables.product.prodname_github_codespaces %}, which accumulates during each monthly billing cycle. For more information, see [AUTOTITLE](/billing/managing-billing-for-your-products/managing-billing-for-github-codespaces/viewing-your-github-codespaces-usage).
+If you create a codespace, it will continue to accrue storage charges until it is deleted, irrespective of whether it is active or stopped. For more information, see [AUTOTITLE](/billing/concepts/product-billing/github-codespaces). Deleting a codespace does not reduce the current billable amount for {% data variables.product.prodname_github_codespaces %}, which accumulates during each monthly billing cycle. For more information, see [AUTOTITLE](/billing/how-tos/products/view-productlicense-use).
 
 For more information on deleting a codespace, see [AUTOTITLE](/codespaces/developing-in-a-codespace/deleting-a-codespace).
 

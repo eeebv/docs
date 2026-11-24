@@ -1,6 +1,6 @@
 ---
 title: Disabling and enabling a workflow
-intro: 'You can disable and re-enable a workflow using the {% data variables.product.prodname_dotcom %} UI, the REST API, or {% data variables.product.prodname_cli %}.'
+intro: You can disable and re-enable a workflow using the {% data variables.product.prodname_dotcom %} UI, the REST API, or {% data variables.product.prodname_cli %}.
 versions:
   fpt: '*'
   ghes: '*'
@@ -11,11 +11,16 @@ redirect_from:
   - /actions/using-workflows/disabling-and-enabling-a-workflow
   - /actions/managing-workflow-runs-and-deployments/managing-workflow-runs/disabling-and-enabling-a-workflow
   - /actions/how-tos/managing-workflow-runs-and-deployments/managing-workflow-runs/disabling-and-enabling-a-workflow
+category:
+  - Manage and monitor workflow runs
+contentType: how-tos
 ---
 
 {% data reusables.actions.enterprise-github-hosted-runners %}
 
 Disabling a workflow allows you to stop a workflow from being triggered without having to delete the file from the repo. You can easily re-enable the workflow again on {% data variables.product.prodname_dotcom %}.
+
+Disabling a workflow doesn't cancel its existing runs, but you can't re-run those runs or their jobs while the workflow is disabled. Enable the workflow first to re-run it.
 
 Temporarily disabling a workflow can be useful in many scenarios. These are a few examples where disabling a workflow might be helpful:
 

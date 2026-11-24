@@ -71,6 +71,29 @@ I am content.
     })
   })
 
+  describe('JavaScript frontmatter', () => {
+    test.each(['js', 'javascript', 'JS'])('does not evaluate ---%s frontmatter', (language) => {
+      const globals = globalThis as Record<string, unknown>
+      delete globals.__fmSideEffect
+      const fixture = `---${language}
+{ title: (globalThis.__fmSideEffect = true, 'x') }
+---
+
+I am content.
+`
+      const { data, errors } = parse(fixture, { filepath })
+      expect(globals.__fmSideEffect).toBeUndefined()
+      expect(data).toBeUndefined()
+      expect(errors).toEqual([
+        {
+          filepath: 'path/to/file.md',
+          message: 'YML parsing error!',
+          reason: 'invalid frontmatter entry',
+        },
+      ])
+    })
+  })
+
   describe('schema', () => {
     test('is optional', () => {
       const schema = {
@@ -107,45 +130,25 @@ I am content.
       expect(content!.trim()).toBe('I am content.')
       expect(errors.length).toBe(1)
       const expectedError = {
-        instancePath: '/meaning_of_life',
-        schemaPath: '#/properties/meaning_of_life/minimum',
-        keyword: 'minimum',
-        params: {
-          comparison: '>=',
-          limit: 50,
-        },
+        property: 'meaning_of_life',
         message: 'must be >= 50',
+        reason: 'minimum',
       }
       expect(errors[0]).toEqual(expectedError)
     })
 
     test('creates errors if versions frontmatter does not match semver format', () => {
       const schema = { type: 'object', required: ['versions'], properties: {} }
-      ;(schema.properties as any).versions = Object.assign(
+      ;(schema.properties as Record<string, unknown>).versions = Object.assign(
         {},
-        (frontmatterSchema.properties as any).versions,
+        (frontmatterSchema.properties as Record<string, unknown>).versions,
       )
 
       const { errors } = parse(fixture2, { schema })
       const expectedError = {
-        instancePath: '/versions/ghes',
-        schemaPath: '#/properties/versions/properties/ghes/errorMessage',
-        keyword: 'errorMessage',
-        params: {
-          errors: [
-            {
-              instancePath: '/versions/ghes',
-              schemaPath: '#/properties/versions/properties/ghes/format',
-              keyword: 'format',
-              params: {
-                format: 'semver',
-              },
-              message: 'must match format "semver"',
-              emUsed: true,
-            },
-          ],
-        },
+        property: 'versions.ghes',
         message: 'Must be a valid SemVer range: "BAD_VERSION"',
+        reason: 'errorMessage',
       }
 
       expect(errors[0]).toEqual(expectedError)
@@ -165,13 +168,9 @@ I am content.
       const { errors } = parse(fixture1, { schema })
       expect(errors.length).toBe(1)
       const expectedError = {
-        instancePath: '',
-        schemaPath: '#/required',
-        keyword: 'required',
-        params: {
-          missingProperty: 'yet_another_key',
-        },
+        property: 'yet_another_key',
         message: "must have required property 'yet_another_key'",
+        reason: 'required',
       }
       expect(errors[0]).toEqual(expectedError)
     })

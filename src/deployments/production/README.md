@@ -1,6 +1,6 @@
 # Production deploys
 
-For internal Docs relating to our production deploys see [TODO Docs-Engineering URL]
+
 
 ## Auto deploys
 
@@ -28,4 +28,4 @@ docker run -p 4000:4000 docs:latest
 ```
 
 > [!NOTE]
-> We require `DOCKER_BUILDKIT=1` to support passing `--secret` to the Dockerfile which allows us to clone private repos at build time. This is done in Moda via the `docker-build-env-secrets` argument in the [.github/workflows/moda-ci.yaml](../../.github/workflows/moda-ci.yaml) workflow.
+> We require `DOCKER_BUILDKIT=1` to support passing `--secret` to the Dockerfile which allows us to clone private repos at build time. This is done in Moda via the `docker-build-env-secrets` argument in the [.github/workflows/moda-ci.yaml](../../../.github/workflows/moda-ci.yaml) workflow.

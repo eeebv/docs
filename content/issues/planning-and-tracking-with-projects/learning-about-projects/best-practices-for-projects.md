@@ -1,5 +1,5 @@
 ---
-title: 'Best practices for {% data variables.product.prodname_projects_v2 %}'
+title: Best practices for {% data variables.product.prodname_projects_v2 %}
 intro: Learn tips for managing your projects.
 allowTitleToDifferFromFilename: true
 versions:
@@ -8,11 +8,9 @@ versions:
   ghes: '*'
 redirect_from:
   - /issues/trying-out-the-new-projects-experience/best-practices-for-managing-projects
-type: overview
-topics:
-  - Projects
-  - Issues
-  - Project management
+contentType: concepts
+category:
+  - Set up and manage projects
 ---
 
 You can use {% data variables.product.prodname_projects_v2 %} to manage your work on {% data variables.product.company_short %}, where your issues and pull requests live. Read on for tips to manage your projects efficiently and effectively. For more information about {% data variables.product.prodname_projects_v2 %}, see [AUTOTITLE](/issues/planning-and-tracking-with-projects/learning-about-projects/about-projects).
@@ -25,17 +23,9 @@ Issues and pull requests include built-in features to let you easily communicate
 
 Breaking a large issue into smaller issues makes the work more manageable and enables team members to work in parallel. It also leads to smaller pull requests, which are easier to review.
 
-{% ifversion sub-issues %}
-
 {% data reusables.issues.about-sub-issues %} See [AUTOTITLE](/issues/tracking-your-work-with-issues/using-issues/adding-sub-issues) and [AUTOTITLE](/issues/tracking-your-work-with-issues/using-issues/browsing-sub-issues).
 
-{% ifversion issue-types %}
-
 You can also use issue types to classify work in repositories across the organization alongside sub-issues. For more information, see [AUTOTITLE](/issues/tracking-your-work-with-issues/using-issues/managing-issue-types-in-an-organization).
-
-{% endif %}
-
-{% endif %}
 
 To ensure efficient progress, clearly define which issues are blocked by, or blocking, other issues. See [AUTOTITLE](/free-pro-team@latest/issues/tracking-your-work-with-issues/using-issues/creating-issue-dependencies).
 

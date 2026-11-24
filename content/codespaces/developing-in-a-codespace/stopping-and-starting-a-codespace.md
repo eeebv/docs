@@ -4,19 +4,20 @@ intro: You can stop and start your codespace to save resources and to pause work
 versions:
   fpt: '*'
   ghec: '*'
-type: how_to
-topics:
-  - Codespaces
-  - Fundamentals
-  - Developer
 shortTitle: Stop a codespace
 redirect_from:
   - /codespaces/developing-in-codespaces/stopping-and-starting-a-codespace
+contentType: how-tos
+category:
+  - Create and manage codespaces
 ---
 
 ## About stopping and starting a codespace
 
 {% data reusables.codespaces.stopping-a-codespace %}
+
+> [!NOTE]
+> A codespace also has a maximum lifetime of 12 hours, regardless of its idle timeout setting. For more information, see [AUTOTITLE](/codespaces/about-codespaces/understanding-the-codespace-lifecycle#maximum-lifetime-of-a-codespace).
 
 Regardless of where you created or access your codespaces, you can view and manage them in your browser at https://github.com/codespaces.
 
@@ -73,10 +74,10 @@ When you restart a codespace you can choose to open it in {% data variables.prod
   gh codespace code
   ```
 
-* To restart a codespace and open it in your browser, use the `gh codespace open --web` subcommand and then choose the codespace you want to restart from the list that's displayed.
+* To restart a codespace and open it in your browser, use the `gh codespace code --web` subcommand and then choose the codespace you want to restart from the list that's displayed.
 
   ```shell copy
-  gh codespace open --web
+  gh codespace code --web
   ```
 
 {% endcli %}
@@ -88,7 +89,3 @@ When you restart a codespace you can choose to open it in {% data variables.prod
 1. In the list of codespaces, select the codespace you want to restart.
 
 {% endvscode %}
-
-## Further reading
-
-* [AUTOTITLE](/codespaces/about-codespaces/understanding-the-codespace-lifecycle)

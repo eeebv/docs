@@ -7,9 +7,8 @@ import type {
   AutocompleteMatchQueriesOptions,
   AutocompleteResultsArgs,
 } from '@/search/lib/get-elasticsearch-results/types'
-import type { QueryDslQueryContainer, SearchTotalHits } from '@elastic/elasticsearch/lib/api/types'
+import type { estypes } from '@elastic/elasticsearch'
 
-// Query Elasticsearch for AI Search autocomplete results
 export async function getAISearchAutocompleteResults({
   indexName,
   query,
@@ -19,15 +18,15 @@ export async function getAISearchAutocompleteResults({
   const t0 = new Date()
   const client = getElasticsearchClient() as Client
 
-  const searchQuery: any = {
+  const searchQuery: estypes.SearchRequest = {
     index: indexName,
     size,
-    // Send absolutely minimal from Elasticsearch to here. Less data => faster.
+    // Request only term values to keep autocomplete payloads small.
     _source_includes: ['term'],
   }
 
   const trimmedQuery = query.trim()
-  // When the query is empty, we want to return the top `size` most popular terms
+  // Empty queries return the most popular terms.
   if (trimmedQuery === '') {
     searchQuery.query = { match_all: {} }
     searchQuery.sort = [{ popularity: { order: 'desc' } }]
@@ -38,7 +37,7 @@ export async function getAISearchAutocompleteResults({
         maxLength: 20,
       },
     })
-    const matchQuery: QueryDslQueryContainer = {
+    const matchQuery: estypes.QueryDslQueryContainer = {
       bool: {
         should: matchQueries,
       },
@@ -65,7 +64,7 @@ export async function getAISearchAutocompleteResults({
 
   return {
     meta: {
-      found: hitsAll.total as SearchTotalHits,
+      found: hitsAll.total as estypes.SearchTotalHits,
       took: { query_msec: result.took, total_msec: new Date().getTime() - t0.getTime() },
       size,
     },
@@ -82,9 +81,8 @@ function getAISearchAutocompleteMatchQueries(
   const BOOST_PREFIX = 1.0
   const BOOST_FUZZY = 0.1
 
-  const matchQueries: QueryDslQueryContainer[] = []
+  const matchQueries: estypes.QueryDslQueryContainer[] = []
 
-  // Use match_phrase for exact term matches
   matchQueries.push({
     match_phrase: {
       term: {
@@ -95,7 +93,6 @@ function getAISearchAutocompleteMatchQueries(
     },
   })
 
-  // Use match for general matching
   matchQueries.push({
     match: {
       term: {
@@ -105,7 +102,6 @@ function getAISearchAutocompleteMatchQueries(
     },
   })
 
-  // Match phrase prefix for partial term matches
   matchQueries.push({
     match_phrase_prefix: {
       term: {
@@ -123,7 +119,6 @@ function getAISearchAutocompleteMatchQueries(
     },
   })
 
-  // Add fuzzy matching for typos and variations
   if (query.length > fuzzy.minLength && query.length < fuzzy.maxLength) {
     matchQueries.push({
       fuzzy: {

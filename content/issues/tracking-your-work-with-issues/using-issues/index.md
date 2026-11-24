@@ -5,8 +5,6 @@ versions:
   fpt: '*'
   ghes: '*'
   ghec: '*'
-topics:
-  - Issues
 children:
   - /creating-an-issue
   - /adding-sub-issues
@@ -15,9 +13,13 @@ children:
   - /editing-an-issue
   - /viewing-all-of-your-issues-and-pull-requests
   - /browsing-sub-issues
+  - /using-artifacts-with-issues
   - /filtering-and-searching-issues-and-pull-requests
   - /creating-a-branch-for-an-issue
   - /linking-a-pull-request-to-an-issue
   - /about-slash-commands
-  - /managing-issue-types-in-an-organization
+  - /managing-issue-types
+  - /managing-issue-fields
+  - /adding-and-managing-issue-fields
+  - /issue-status-webhooks-and-workflows
 ---

@@ -1,13 +1,16 @@
 ---
 title: GitHub-hosted runners reference
 shortTitle: GitHub-hosted runners
-intro: 'Find information about {% data variables.product.github %}-hosted runners, including their specifications and customization options.'
+intro: Find information about {% data variables.product.github %}-hosted runners, including their specifications and customization options.
 versions:
   fpt: '*'
   ghes: '*'
   ghec: '*'
 redirect_from:
   - /actions/reference/github-hosted-runners-reference
+category:
+  - Set up runners
+contentType: reference
 ---
 
 {% ifversion ghes %}
@@ -38,7 +41,10 @@ For lists of available runners, see:
 
 {% data reusables.actions.supported-github-runners %}
 
-Workflow logs list the runner used to run a job. For more information, see [AUTOTITLE](/actions/monitoring-and-troubleshooting-workflows/viewing-workflow-run-history).
+> [!NOTE]
+> {% data reusables.actions.macos-runner-capacity %}
+
+Workflow logs list the runner used to run a job. For more information, see [AUTOTITLE](/actions/how-tos/monitor-workflows/view-workflow-run-history).
 
 ### Limitations for arm64 macOS runners
 
@@ -46,17 +52,14 @@ Workflow logs list the runner used to run a job. For more information, see [AUTO
 
 ### Single-CPU runners
 
-> [!NOTE]
-> * Single-CPU runners are in {% data variables.release-phases.public_preview %} and subject to change.{% ifversion ghec %}
-> * Single-CPU runners are not available in {% data variables.product.prodname_ghe_cloud %} with Data Residency (`ghe.com`).
-
-{% endif %}
-
 Single-CPU {% data variables.product.github %}-hosted runners are available in both public and private repositories. These runners—specified using the workflow label `ubuntu-slim`—offer a lower-cost option for running lightweight operations. This type of runner is optimized for automation tasks, issue operations and short-running jobs. They are not suitable for typical heavyweight CI/CD builds.
 
 `ubuntu-slim` runners execute Actions workflows in Ubuntu Linux, inside a container rather than a full VM instance. When the job begins, {% data variables.product.github %} automatically provisions a new container for that job. All steps in the job execute in the container, allowing the steps in that job to share information using the runner's file system. When the job has finished, the container is automatically decommissioned. Each container provides hypervisor level 2 isolation.
 
-A minimal set of tools is installed on the `ubuntu-slim` runner image, appropriate for lightweight tasks.
+> [!NOTE]
+> The container for `ubuntu-slim` runners runs in unprivileged mode. This means that some operations requiring elevated privileges—such as mounting file systems, using Docker-in-Docker, or accessing low-level kernel features—are not supported.
+
+A minimal set of tools is installed on the `ubuntu-slim` runner image, appropriate for lightweight tasks. For details on what software is installed on the `ubuntu-slim` image, see the [README file](https://github.com/actions/runner-images/blob/main/images/ubuntu-slim/ubuntu-slim-Readme.md) in the `actions/runner-images` repository.
 
 #### Usage limits
 
@@ -66,9 +69,11 @@ The job timeout for single-CPU runners is 15 minutes. If a job reaches this limi
 
 ### {% data variables.actions.hosted_runner_caps %}s
 
+{% data variables.actions.hosted_runner_caps %}s are available for organizations and enterprises on {% data variables.product.prodname_team %} and {% data variables.product.prodname_ghe_cloud %} plans.
+
 {% data reusables.actions.about-larger-runners %}
 
-For more information, see [AUTOTITLE](/actions/using-github-hosted-runners/about-larger-runners).
+For more information, see [AUTOTITLE](/actions/how-tos/manage-runners/larger-runners).
 
 ## Administrative privileges
 
@@ -78,11 +83,13 @@ Windows virtual machines are configured to run as administrators with User Accou
 
 ## IP addresses
 
-To get a list of IP address ranges that {% data variables.product.prodname_actions %} uses for {% data variables.product.prodname_dotcom %}-hosted runners, you can use the {% data variables.product.prodname_dotcom %} REST API. For more information, see the `actions` key in the response of the `GET /meta` endpoint. For more information, see [AUTOTITLE](/rest/meta/meta#get-github-meta-information).
+To get the full set of IP address ranges from which {% data variables.product.prodname_dotcom %}-hosted runners may be assigned an IP address, use the `actions` key in the response from the `GET /meta` REST API endpoint. For more information, see [AUTOTITLE](/rest/meta/meta#get-github-meta-information).
 
-Windows and Ubuntu runners are hosted in Azure and subsequently have the same IP address ranges as the Azure datacenters. macOS runners are hosted in {% data variables.product.prodname_dotcom %}'s own macOS cloud.
+These ranges are not dedicated to {% data variables.product.prodname_actions %}. They cover the broader address space of the cloud provider regions where {% data variables.product.prodname_dotcom %}-hosted runners run, and include IP addresses used by unrelated services and customers. macOS runners are hosted in {% data variables.product.prodname_dotcom %}'s own macOS cloud.
 
-Since there are so many IP address ranges for {% data variables.product.prodname_dotcom %}-hosted runners, we do not recommend that you use these as allowlists for your internal resources. Instead, we recommend you use {% data variables.actions.hosted_runner %}s with a static IP address range, or self-hosted runners. For more information, see [AUTOTITLE](/actions/using-github-hosted-runners/about-larger-runners) or [AUTOTITLE](/actions/hosting-your-own-runners/managing-self-hosted-runners/about-self-hosted-runners).
+If you use an allowlist to control access to your internal resources from {% data variables.product.prodname_dotcom %}-hosted runners, we do not recommend adding these ranges to it. Allowlisting the entire set permits network access from unrelated workloads within those ranges, not just your {% data variables.product.prodname_actions %} runners. This substantially broadens access and undermines the restrictions your allowlist is intended to enforce. Instead, we recommend you use {% data variables.actions.hosted_runner %}s with a static IP address range, or self-hosted runners. For more information, see [AUTOTITLE](/actions/how-tos/manage-runners/larger-runners) or [AUTOTITLE](/actions/concepts/runners/self-hosted-runners).
+
+Eligible Linux runners use a multi-cloud compute pool, so their outbound IP addresses are not limited to Azure datacenter ranges. Policies that allow only Azure or Microsoft-owned ranges, including Microsoft Entra Conditional Access policies, can block connections or authentication from these runners. For multi-cloud eligibility, see [Cloud hosts used by {% data variables.product.prodname_dotcom %}-hosted runners](/actions/concepts/runners/github-hosted-runners#cloud-hosts-used-by-github-hosted-runners).
 
 The list of {% data variables.product.prodname_actions %} IP addresses returned by the API is updated once a week.
 
@@ -106,7 +113,7 @@ To ensure proper communications for {% data variables.product.github %}-hosted r
 | `workspace` | `GITHUB_WORKSPACE` | Actions and shell commands execute in this directory. An action can modify the contents of this directory, which subsequent actions can access. |
 | `workflow/event.json` | `GITHUB_EVENT_PATH` | The `POST` payload of the webhook event that triggered the workflow. {% data variables.product.prodname_dotcom %} rewrites this each time an action executes to isolate file content between actions.
 
-For a list of the environment variables {% data variables.product.prodname_dotcom %} creates for each workflow, see [AUTOTITLE](/actions/learn-github-actions/variables#default-environment-variables).
+For a list of the environment variables {% data variables.product.prodname_dotcom %} creates for each workflow, see [AUTOTITLE](/actions/how-tos/write-workflows/choose-what-workflows-do/use-variables).
 
 ### Docker container filesystem
 

@@ -5,9 +5,9 @@ versions:
   fpt: '*'
   ghec: '*'
   ghes: '*'
-topics:
-  - Organizations
 shortTitle: Customize organization profile
+category:
+  - Set up your organization
 ---
 
 
@@ -46,6 +46,8 @@ If you manage multiple organizations with an enterprise account, you can help me
 
 ## Adding a public organization profile README
 
+>[!NOTE] Public organization profiles are not available with {% data variables.product.prodname_emus %}.
+
 The content of public `README.md` will appear on your organization's public profile.
 
 1. If your organization does not already have a public `.github` repository, create a public `.github` repository.
@@ -53,6 +55,8 @@ The content of public `README.md` will appear on your organization's public prof
 1. Commit the changes to the `README.md` file.
 
 ## Adding a member-only organization profile README
+
+>[!NOTE] Member-only organization profile READMEs will only load from a `.github-private` repository with its visibility set to private. Repositories in enterprises set to internal visibility will not work.
 
 The content of a member-only `README.md` will be displayed in the member view of your organization's profile.
 
@@ -103,4 +107,4 @@ You can replace the identicon with an image that represents your organization. T
 ## Further reading
 
 * [AUTOTITLE](/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes)
-* [AUTOTITLE](/account-and-profile/setting-up-and-managing-your-github-profile/customizing-your-profile/managing-your-profile-readme)
+* [AUTOTITLE](/account-and-profile/how-tos/profile-customization/managing-your-profile-readme)

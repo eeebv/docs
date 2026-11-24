@@ -1,5 +1,7 @@
 import fs from 'fs'
 import path from 'path'
+import { TokenKind } from 'liquidjs'
+import type { TagToken } from 'liquidjs'
 import { getLiquidTokens } from '@/content-linter/lib/helpers/liquid-utils'
 import {
   FilesWithLineNumbers,
@@ -24,14 +26,13 @@ export function findUsed(reusablePath: string, { absolute }: { absolute: boolean
   const filesWithReusables: FilesWithLineNumbers = []
 
   for (const filePath of allFilePaths) {
-    // Skip the reusable file itself
+    // Do not report a reusable as a use of itself.
     if (filePath === reusableFilePath) continue
 
     const fileContents = fs.readFileSync(filePath, 'utf-8')
 
     const indices = getIndicesOfLiquidVariable(reusableLiquidVar, fileContents)
     if (indices.length > 0) {
-      // Find line numbers of each index in fileContents
       const lineNumbers = indices.map((index) => fileContents.slice(0, index).split('\n').length)
 
       filesWithReusables.push({
@@ -51,11 +52,15 @@ export function findTopUsed(numberOfMostUsedToFind: number, { absolute }: { abso
   const reusableCounts = new Map<string, number>()
   for (const filePath of allFilePaths) {
     const fileContents = fs.readFileSync(filePath, 'utf-8')
-    const liquidTokens = getLiquidTokens(fileContents)
+    const liquidTokens = getLiquidTokens(fileContents).filter(
+      (token): token is TagToken => token.kind === TokenKind.Tag,
+    )
     for (const token of liquidTokens) {
       const { args, name } = token
-      if (name === 'data' && args.startsWith('reusables.')) {
-        reusableCounts.set(args, (reusableCounts.get(args) || 0) + 1)
+      if (name !== 'data' && name !== 'indented_data_reference') continue
+      const key = args.trim().split(/\s+/)[0]
+      if (key.startsWith('reusables.')) {
+        reusableCounts.set(key, (reusableCounts.get(key) || 0) + 1)
       }
     }
   }

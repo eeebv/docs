@@ -14,8 +14,8 @@ versions:
   fpt: '*'
   ghes: '*'
   ghec: '*'
-topics:
-  - Webhooks
+category:
+  - Test and troubleshoot
 ---
 
 ## About testing webhooks
@@ -32,7 +32,7 @@ You can trigger a webhook event and verify that {% data variables.product.compan
 
    You can also redeliver a previous webhook delivery. For more information, see [AUTOTITLE](/webhooks/testing-and-troubleshooting-webhooks/redelivering-webhooks).
 
-   If you are using an organization or repository webhook, you can also use the REST API to trigger the `ping` event for your webhook. If you are using a repository webhook and your webhook is subscribed to the `push` event, you can use the REST API to trigger a test `push` event for your webhook. For more information, see [AUTOTITLE](/rest/webhooks/repos) and [AUTOTITLE](/rest/orgs/webhooks).
+   If you are using an organization or repository webhook, you can also use the REST API to trigger the `ping` event for your webhook. If you are using a repository webhook and your webhook is subscribed to the `push` event, you can use the REST API to trigger a test `push` event for your webhook. For more information, see [AUTOTITLE](/rest/repos/webhooks) and [AUTOTITLE](/rest/orgs/webhooks).
 
 1. Check {% data variables.product.company_short %} to verify that a webhook delivery was sent. For information about how to do this for each webhook type, see [AUTOTITLE](/webhooks/testing-and-troubleshooting-webhooks/viewing-webhook-deliveries).
 
@@ -43,6 +43,8 @@ If a webhook delivery was not sent, or if a webhook delivery was sent but {% dat
 In order to test your webhook code locally on your computer or codespace, you can use a webhook proxy URL to forward webhooks from {% data variables.product.company_short %} to your computer or codespace. You can use your computer or codespace as a local server to receive these forwarded webhooks.
 
 The following sections demonstrate how to use smee.io to provide a webhook proxy URL and forward webhooks.
+
+Smee is intended for development and testing only. {% data reusables.webhooks.smee-security-caveat-and-alternatives %} If you use one of these tools, use the public URL that it provides as your webhook URL, and skip the smee-specific steps in the following sections.
 
 For specific examples of code and testing steps, see [AUTOTITLE](/webhooks/using-webhooks/handling-webhook-deliveries).
 

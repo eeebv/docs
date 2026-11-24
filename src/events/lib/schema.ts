@@ -2,6 +2,7 @@ import { languageKeys } from '@/languages/lib/languages-server'
 import { allVersionKeys } from '@/versions/lib/all-versions'
 import { productIds } from '@/products/lib/all-products'
 import { allTools } from '@/tools/lib/all-tools'
+import { codeLanguages } from '@/content-render/lib/code-languages'
 import { contentTypesEnum } from '@/frame/lib/frontmatter'
 
 const versionPattern = '^\\d+(\\.\\d+)?(\\.\\d+)?$'
@@ -11,7 +12,6 @@ const context = {
   additionalProperties: false,
   required: ['event_id', 'user', 'version', 'created', 'path'],
   properties: {
-    // Required of all events
     event_id: {
       type: 'string',
       description: 'The unique identifier of the event.',
@@ -39,10 +39,10 @@ const context = {
       format: 'uuid',
     },
 
-    // Content information
     referrer: {
       type: 'string',
-      description: 'The browser value of `document.referrer`.',
+      description:
+        'The browser value of `document.referrer` on a full page load, or the previous docs URL after client-side navigation.',
       format: 'uri-reference',
     },
     title: {
@@ -94,17 +94,18 @@ const context = {
     page_document_type: {
       type: 'string',
       description: 'The generic page document type based on URL path.',
-      enum: ['homepage', 'early-access', 'product', 'category', 'subcategory', 'article'], // get-document-type.ts
-    },
-    page_type: {
-      type: 'string',
-      description: 'Optional page type from the content frontmatter.',
-      enum: ['overview', 'quick_start', 'tutorial', 'how_to', 'reference', 'rai'], // frontmatter.ts
+      // Keep in sync with get-document-type.ts.
+      enum: ['homepage', 'early-access', 'product', 'category', 'subcategory', 'article'],
     },
     content_type: {
       type: 'string',
       description: 'Optional content type from the content frontmatter (EDI content models).',
       enum: contentTypesEnum,
+    },
+    docs_team_metrics: {
+      type: 'string',
+      description:
+        'Optional comma-separated list of docsTeamMetrics frontmatter values for internal analytics filtering.',
     },
     status: {
       type: 'number',
@@ -124,8 +125,12 @@ const context = {
       type: 'boolean',
       description: 'The cookie value of staffonly',
     },
+    octo_client_id: {
+      type: 'string',
+      description:
+        'The _octo cookie client ID for cross-subdomain tracking with github.com analytics.',
+    },
 
-    // Device information
     os: {
       type: 'string',
       description: 'The type of operating system the user is working with.',
@@ -183,7 +188,6 @@ const context = {
       description: 'The raw user agent string from the browser.',
     },
 
-    // Location information
     timezone: {
       type: 'number',
       description: 'The timezone the user is in, as `new Date().getTimezoneOffset() / -60`.',
@@ -193,7 +197,6 @@ const context = {
       description: 'The browser value of `navigator.language`.',
     },
 
-    // Preference information
     os_preference: {
       type: 'string',
       enum: ['linux', 'mac', 'windows'],
@@ -213,13 +216,12 @@ const context = {
       description: 'How the user prefers to view code examples.',
     },
 
-    // Experiments
     experiment_variation: {
       type: 'string',
       description: 'The variation this user we bucketed in is in, such as control or treatment.',
     },
 
-    // Event Grouping. The comination of key + id should be unique
+    // The event group key and ID pair must be unique.
     event_group_key: {
       type: 'string',
       description: 'A enum indentifier (e.g. "ask-ai") used to put events into a specific group.',
@@ -257,30 +259,31 @@ const exit = {
     },
     exit_render_duration: {
       type: 'number',
-      description: 'How long the server took to render the page content, in seconds.',
-      minimum: 0.001,
+      description:
+        'How long the server took to render the page content, in seconds. Only sent for a full page load.',
+      minimum: 0,
     },
     exit_first_paint: {
       type: 'number',
-      minimum: 0.001,
+      minimum: 0,
       description:
-        'The duration until `first-contentful-paint`, in seconds. Informs CSS performance.',
+        'The duration until `first-contentful-paint`, in seconds. Informs CSS performance. Only sent for a full page load.',
     },
     exit_dom_interactive: {
       type: 'number',
-      minimum: 0.001,
+      minimum: 0,
       description:
-        'The duration until `PerformanceNavigationTiming.domInteractive`, in seconds. Informs JavaScript loading performance.',
+        'The duration until `PerformanceNavigationTiming.domInteractive`, in seconds. Informs JavaScript loading performance. Only sent for a full page load.',
     },
     exit_dom_complete: {
       type: 'number',
-      minimum: 0.001,
+      minimum: 0,
       description:
-        'The duration until `PerformanceNavigationTiming.domComplete`, in seconds. Informs JavaScript execution performance.',
+        'The duration until `PerformanceNavigationTiming.domComplete`, in seconds. Informs JavaScript execution performance. Only sent for a full page load.',
     },
     exit_visit_duration: {
       type: 'number',
-      minimum: 0.001,
+      minimum: 0,
       description:
         'The duration of exit.timestamp - page.timestamp, in seconds. Informs bounce rate.',
     },
@@ -357,6 +360,7 @@ const link = {
         'toc',
         'footer',
         'static',
+        'markdown-source-menu',
       ],
       description: 'The part of the page where the user clicked the link.',
     },
@@ -406,7 +410,8 @@ const search = {
     },
     search_client: {
       type: 'string',
-      description: 'The client name identifier when the request is not from docs.github.com.',
+      description:
+        "The client name identifier when the request is not from docs.github.com, or 'unknown' when the request sends no client_name.",
     },
   },
 }
@@ -568,7 +573,7 @@ const clipboard = {
     clipboard_operation: {
       type: 'string',
       description: 'Which clipboard operation the user is performing.',
-      enum: ['copy', 'paste', 'cut'],
+      enum: ['copy', 'paste', 'cut', 'share'],
     },
     clipboard_target: {
       type: 'string',
@@ -602,29 +607,63 @@ const preference = {
     },
     preference_name: {
       type: 'string',
-      enum: ['application', 'color_mode', 'os', 'code_display'],
-      description: 'The preference name, such as os, application, or color_mode',
+      enum: ['application', 'color_mode', 'os', 'code_display', 'code_language'],
+      description: 'The preference name, such as os, application, color_mode, or code_language',
     },
     preference_value: {
       type: 'string',
       enum: [
-        // application
-        ...Object.keys(allTools),
-        // color_mode
-        'dark',
-        'light',
-        'auto',
-        'auto:dark',
-        'auto:light',
-        // os
-        'linux',
-        'mac',
-        'windows',
-        // code_display
-        'beside',
-        'inline',
+        ...new Set([
+          ...Object.keys(allTools),
+          'dark',
+          'light',
+          'auto',
+          'auto:dark',
+          'auto:light',
+          'linux',
+          'mac',
+          'windows',
+          'beside',
+          'inline',
+          // code_language can overlap with allTools, for example javascript.
+          ...Object.keys(codeLanguages),
+        ]),
       ],
-      description: 'The application, color_mode, os, or code_display selected by the user.',
+      description:
+        'The application, color_mode, os, code_display, or code_language selected by the user.',
+    },
+  },
+}
+
+const tableInteraction = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['type', 'context', 'table_interaction_name', 'table_interaction_type'],
+  properties: {
+    context,
+    type: {
+      type: 'string',
+      pattern: '^tableInteraction$',
+    },
+    table_interaction_name: {
+      type: 'string',
+      description:
+        'Identifier for the table being interacted with (e.g. "secret-scanning-patterns").',
+    },
+    table_interaction_type: {
+      type: 'string',
+      enum: ['search', 'filter', 'sort', 'paginate', 'reset'],
+      description: 'The kind of interaction the user performed with the table.',
+    },
+    table_interaction_field_name: {
+      type: 'string',
+      description:
+        'The field/column the interaction targeted (e.g. "pushProtection"). Omitted for whole-table actions.',
+    },
+    table_interaction_field_value: {
+      type: 'string',
+      description:
+        'The value applied to the field (e.g. the filter value, search query, sort direction, or page number).',
     },
   },
 }
@@ -650,7 +689,7 @@ const validation = {
   },
 }
 
-// We are not using `oneOf` to keep the list of errors short.
+// Avoid oneOf so validation returns a short error list.
 export const schemas = {
   page,
   exit,
@@ -665,6 +704,7 @@ export const schemas = {
   clipboard,
   print,
   preference,
+  tableInteraction,
   validation,
 }
 
@@ -682,6 +722,7 @@ export const hydroNames = {
   clipboard: 'docs.v0.ClipboardEvent',
   print: 'docs.v0.PrintEvent',
   preference: 'docs.v0.PreferenceEvent',
+  tableInteraction: 'docs.v0.TableInteractionEvent',
   validation: 'docs.v0.ValidationEvent',
 } as Record<keyof typeof schemas, string>
 

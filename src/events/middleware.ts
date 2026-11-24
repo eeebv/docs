@@ -1,3 +1,4 @@
+import { createLogger } from '@/observability/logger'
 import express from 'express'
 import { omit, without, mapValues } from 'lodash-es'
 import QuickLRU from 'quick-lru'
@@ -7,13 +8,17 @@ import type { ExtendedRequest } from '@/types'
 import type { Response } from 'express'
 
 import { schemas, hydroNames } from './lib/schema'
+import type { EventT } from './lib/hydro'
 import catchMiddlewareError from '@/observability/middleware/catch-middleware-error'
 import { noCacheControl } from '@/frame/middleware/cache-control'
 import { getJsonValidator } from '@/tests/lib/validate-json-schema'
 import { formatErrors } from './lib/middleware-errors'
 import { publish as _publish } from './lib/hydro'
+import { DOTCOM_USER_COOKIE_NAME, STAFFONLY_COOKIE_NAME } from '@/frame/lib/constants'
 import { analyzeComment, getGuessedLanguage } from './lib/analyze-comment'
 import { EventType, EventProps, EventPropsByType } from './types'
+
+const logger = createLogger(import.meta.url)
 
 const router = express.Router()
 const OMIT_FIELDS = ['type']
@@ -21,10 +26,9 @@ const allowedTypes = new Set(without(Object.keys(schemas), 'validation'))
 const isProd = process.env.NODE_ENV === 'production'
 const validators = mapValues(schemas, (schema) => getJsonValidator(schema))
 
-// In production, fire and not wait to respond.
-// _publish will send an error to failbot,
-// so we don't get alerts but we still track it.
-// This ends up being the same as try > await > catch > (do nothing).
+// Production does not await Hydro so the request can return before publishing finishes.
+// _publish reports eligible 3xx and 4xx responses to Failbot; unhandled rejections and 5xx
+// responses follow separate monitoring paths.
 async function publish(...args: Parameters<typeof _publish>) {
   if (isProd) {
     _publish(...args)
@@ -38,10 +42,9 @@ const sentValidationErrors = new QuickLRU({
   maxAge: 1000 * 60,
 })
 
-// We use a LRU cache & a hash of the error message
-// to prevent sending multiple validation errors that can spam requests to Hydro
+// Hash validation errors in an LRU cache to avoid flooding Hydro with repeated failures.
 const getValidationErrorHash = (validateErrors: ErrorObject[]) => {
-  // limit to 10 second windows
+  // Hash keys include a 10-second bucket; the LRU retains buckets for up to 60 seconds.
   const window: number = Math.floor(new Date().getTime() / 10000)
   return `${window}:${(validateErrors || [])
     .map((error: ErrorObject) => error.message + error.instancePath + JSON.stringify(error.params))
@@ -54,12 +57,11 @@ router.post(
     noCacheControl(res)
 
     const eventsToProcess = Array.isArray(req.body) ? req.body : [req.body]
-    const validEvents: any[] = []
-    const validationErrors: any[] = []
+    const validEvents: EventT[] = []
+    const validationErrors: EventT[] = []
 
     for (const eventBody of eventsToProcess) {
       try {
-        // Skip event if it doesn't have a type or if the type is not in the allowed types
         if (!eventBody.type || !allowedTypes.has(eventBody.type)) {
           continue
         }
@@ -74,12 +76,12 @@ router.post(
         }
 
         if (body.context) {
-          // Add dotcom_user to the context if it's available
-          // JSON.stringify removes `undefined` values but not `null`, and we don't want to send `null` to Hydro
-          body.context.dotcom_user = req.cookies?.dotcom_user ? req.cookies.dotcom_user : undefined
-          body.context.is_staff = Boolean(req.cookies?.staffonly)
-          // Add IP address and user agent from request
-          // Moda forwards the client's IP using the `fastly-client-ip` header
+          // JSON.stringify drops undefined but keeps null, and we do not send null to Hydro.
+          body.context.dotcom_user = req.cookies?.[DOTCOM_USER_COOKIE_NAME]
+            ? req.cookies[DOTCOM_USER_COOKIE_NAME]
+            : undefined
+          body.context.is_staff = Boolean(req.cookies?.[STAFFONLY_COOKIE_NAME])
+          // Moda forwards the client's IP through the fastly-client-ip header.
           body.context.ip = req.headers['fastly-client-ip'] as string | undefined
           body.context.user_agent ??= req.headers['user-agent']
         }
@@ -99,7 +101,7 @@ router.post(
           value: omit(body, OMIT_FIELDS),
         })
       } catch (eventError) {
-        console.error('Error validating event:', eventError)
+        logger.error('Error validating event', { error: eventError })
       }
     }
     if (validEvents.length > 0) {

@@ -5,14 +5,10 @@ redirect_from:
   - /enterprise/admin/authentication
   - /admin/authentication
   - /admin/identity-and-access-management
+allowTitleToDifferFromFilename: true
 versions:
   ghec: '*'
   ghes: '*'
-topics:
-  - Accounts
-  - Authentication
-  - Enterprise
-  - SSO
 children:
   - /understanding-iam-for-enterprises
   - /iam-configuration-reference
@@ -24,5 +20,6 @@ children:
   - /provisioning-user-accounts-with-scim
   - /reconfiguring-iam-for-enterprise-managed-users
   - /managing-recovery-codes-for-your-enterprise
+  - /respond-to-incidents
 ---
 

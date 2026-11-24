@@ -15,8 +15,8 @@ redirect_from:
   - /developers/apps/about-apps
   - /developers/apps/getting-started-with-apps/about-apps
   - /apps/creating-github-apps/setting-up-a-github-app/about-creating-github-apps
-topics:
-  - GitHub Apps
+category:
+  - Understand GitHub Apps
 ---
 
 ## About {% data variables.product.prodname_github_apps %}
@@ -34,7 +34,7 @@ Like {% data variables.product.prodname_oauth_apps %}, {% data variables.product
 {% data variables.product.prodname_github_apps %} can be installed directly on {% ifversion enterprise-installed-apps %}enterprises, {% endif %}organizations and personal accounts and granted access to specific repositories. They come with built-in webhooks and narrow, specific permissions.
 
 {% ifversion enterprise-apps-public-beta %}
-You can also create an enterprise-owned {% data variables.product.prodname_github_app %} that can only be installed on{% ifversion enterprise-installed-apps %} the enterprise itself or{% endif %} organizations within your enterprise, and can only be authorized by members of your enterprise. For more information, see [AUTOTITLE](/admin/managing-your-enterprise-account/creating-github-apps-for-your-enterprise).
+You can also create an enterprise-owned {% data variables.product.prodname_github_app %} that can only be installed on{% ifversion enterprise-installed-apps %} the enterprise itself or{% endif %} organizations within your enterprise, and can only be authorized by members of your enterprise. For more information, see [AUTOTITLE](/admin/managing-github-apps-for-your-enterprise/creating-github-apps-for-your-enterprise).
 {% endif %}
 
 {% data reusables.apps.app_manager_role %}
@@ -51,7 +51,7 @@ To use your {% data variables.product.prodname_github_app %}, you need to instal
 
 * If your {% data variables.product.prodname_github_app %} is **private**, you can only install it on the account that owns the app.
 * If your {% data variables.product.prodname_github_app %} is **public**, other accounts can also install it.{% ifversion enterprise-apps-public-beta %}
-* If your {% data variables.product.prodname_github_app %} is owned by an **enterprise**, you can install it on {% ifversion enterprise-installed-apps %}the enterprise itself or {% endif %}any organization within that enterprise.{% endif %}{% ifversion restrictive-app-authz %} Only members of the enterprise can sign in to it.{% endif %}
+* If your {% data variables.product.prodname_github_app %} is owned by an **enterprise**, you can install it on {% ifversion enterprise-installed-apps %}the enterprise itself or {% endif %}any organization within that enterprise.{% endif %} Only members of the enterprise can sign in to it.
 
 For more information, see [AUTOTITLE](/apps/using-github-apps/installing-your-own-github-app) and [AUTOTITLE](/apps/sharing-github-apps/sharing-your-github-app).
 
@@ -78,7 +78,7 @@ Some examples of automations you could create with a {% data variables.product.p
 
 ### {% data variables.product.prodname_github_apps %} that respond to webhooks
 
-If you want your app to respond to events on {% data variables.product.prodname_dotcom %}, your app should subscribe to webhooks. For example, you may want your app to leave a comment when a pull request is opened. For more information, see [AUTOTITLE](/apps/creating-github-apps/setting-up-a-github-app/using-webhooks-with-github-apps).
+If you want your app to respond to events on {% data variables.product.prodname_dotcom %}, your app should subscribe to webhooks. For example, you may want your app to leave a comment when a pull request is opened. For more information, see [AUTOTITLE](/apps/creating-github-apps/registering-a-github-app/using-webhooks-with-github-apps).
 
 {% ifversion enterprise-installed-apps %}
 Apps installed on enterprises do not currently support webhooks, and must be installed on an organization to receive them.
